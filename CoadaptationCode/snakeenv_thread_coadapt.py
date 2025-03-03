@@ -125,15 +125,8 @@ class SnakeEnv(gymnasium.Env):
 
         # reward forward movement
         reward = (currXPos - self.prevPos) * self.rewardScale
-
-        # if currXPos < self.prevPos:  # Moving backward
-        #     reward -= 10  # Penalize backward movement
-
-        # Penalty for going backward, penalize excessive energy use
-        # energy_penalty = -0.01 * np.sum(np.abs(action)) 
-        # smoothness_penalty = -np.sum(np.abs(action - self.prevAction)) if hasattr(self, 'prevAction') else 0
-
-        # reward += energy_penalty + smoothness_penalty  # Apply penalties
+        if reward < 0:
+            reward = 0.0
 
         # check if the goal is reached
         if currXPos > self.targetPositionX:  # Past goal position

@@ -28,10 +28,10 @@ class Train():
         self.env = gym.make("SnakeRobot")
     
         self._reward_scale = 1.0
-        self._episode_length = 10 # number of timesteps per episode
+        self._episode_length = 300 # number of timesteps per episode
         self.episode_counter = 0
-        self.episodes_before_training = 1 # number of episodes before training to fill the replay buffer
-        self.episode_iterations = 5 # number of episodes per design
+        self.episodes_before_training = 10 # number of episodes before training to fill the replay buffer
+        self.episode_iterations = 30 # number of episodes per design
         self.design_cylces = 20 # total number of design cycles
 
         self.episodeCumulativeRewards = []  # Stores cumulative rewards per episode
@@ -57,7 +57,7 @@ class Train():
 
         # set up design variables
         self.do_alg = PSO_batch(self.replay, self.env)
-        self.design_counter = 0
+        self.design_counter = 2
         self.episode_counter = 0
         self.data_design_type = 'Initial'
         
@@ -576,7 +576,7 @@ if __name__ == '__main__':
     trainingloopThread.start() # start this thread last so can populate motor and opti data
     trainingloopThread.join()
     
-    #picklefile = open('Design10CoptPopNetFeb20', 'wb')# open pickle file you want to dump/write to 
+    # picklefile = open('Design10CoptPopNetFeb20', 'wb')# open pickle file you want to dump/write to 
     # print(type(trainingObj))
-    #pickle.dump(trainingObj, picklefile) # save object to file
-    #picklefile.close() # close file
+    # pickle.dump(trainingObj, picklefile) # save object to file
+    # picklefile.close() # close file

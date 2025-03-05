@@ -116,29 +116,33 @@ class SnakeEnv(gymnasium.Env):
 
         self.writeAction(actionForMotors)
 
-        nextObs, global_pos = self._get_obs()
+        nextObs = self._get_obs()
 
         # Log global positions
         SnakeEnv.optiXTrack.append(SnakeEnv.optiRelPos[0])  # global x position of robot
         SnakeEnv.optiYTrack.append(SnakeEnv.optiRelPos[2])  # global y position of robot
 
         # extract X position
-        #currXPos = nextObs[0]  # opti X position of the robot
+        currXPos = nextObs[0]  # opti X position of the robot
 
-        currXPos = global_pos[0]
+        #currXPos = global_pos[0]
 
         # # reward forward movement
         # reward = (currXPos - self.prevPos) * self.rewardScale
 
-        print("global pos")
-        print(global_pos)
+        #print("global pos")
+        #print(global_pos)
 
-        max_distance = self.starting_position + 10 
+        max_distance = self.targetPositionX - (self.starting_position - 20) 
         distance = abs(self.targetPositionX - currXPos)
-        reward = 1 - (distance / max_distance)
+        reward = np.exp(1 - (distance / max_distance))
 
-        if reward < 0:
-            reward = np.exp(reward)
+        #reward = max_distance - distance
+
+        # if reward < 0:
+        #     reward = np.exp(reward)
+        # else:
+        #     reward = reward * 10
 
 
         # Exponential transformation for small negative values
@@ -167,7 +171,7 @@ class SnakeEnv(gymnasium.Env):
 
         # add design info to observation
 
-        nextObs = np.append(global_pos, SnakeEnv.config_numpy)
+        nextObs = np.append(nextObs, SnakeEnv.config_numpy)
         print(f"Observation: {nextObs}")
 
         return np.array(nextObs), reward, terminated, truncated, info
@@ -212,7 +216,7 @@ class SnakeEnv(gymnasium.Env):
 
         # return current observation
         print("about to observe")  
-        observation, _ = self._get_obs(initial=True)
+        observation = self._get_obs(initial=True)
         SnakeEnv.enableMotorTorque()
         # DO NOT UNCOMMENT IN
 
@@ -245,9 +249,9 @@ class SnakeEnv(gymnasium.Env):
         # read agent x,y,z,etc and target goal pos
         # return {"agent": self._agent_location, "target": self._target_location}
         
-        self.agentPos, global_state = self.getPosition(initial)
+        self.agentPos = self.getPosition(initial)
        
-        return [*self.agentPos], global_state
+        return [*self.agentPos]
     
     def getPosition(self, initial):
        
@@ -262,8 +266,8 @@ class SnakeEnv(gymnasium.Env):
         if initial == True:
             SnakeEnv.prevPos = SnakeEnv.optiPosition[0:3]
 
-        optiPositionCoord = [(curr- prev)*100 for curr, prev in zip(SnakeEnv.optiPosition[0:3], SnakeEnv.prevPos)] # adjusting position to measure previous
-        optiPositionCoord_global = [(curr)*100 for curr in zip(SnakeEnv.optiPosition[0:3], SnakeEnv.prevPos)]
+        #optiPositionCoord = [(curr- prev)*100 for curr, prev in zip(SnakeEnv.optiPosition[0:3], SnakeEnv.prevPos)] # adjusting position to measure previous
+        optiPositionCoord_global = [(curr)*100 for curr, _ in zip(SnakeEnv.optiPosition[0:3], SnakeEnv.prevPos)]
         #optiAngle = [i/100 for i in SnakeEnv.optiPosition[3:6]] # only accessing y heading 
         optiAngle = SnakeEnv.optiPosition[4]/100
         # print('MOTOR POS', SnakeEnv.motorPosition)
@@ -273,13 +277,13 @@ class SnakeEnv(gymnasium.Env):
         #    time.sleep(.001)
         #    SnakeEnv.motorLock.acquire()
         print('CHANGE')
-        self.currPosition = [*optiPositionCoord, optiAngle, *SnakeEnv.motorPosition] # reads static variables that are being updated in the threads 
+        self.currPosition = [*optiPositionCoord_global, optiAngle, *SnakeEnv.motorPosition] # reads static variables that are being updated in the threads 
         
         while SnakeEnv.motorPosition == []:
             SnakeEnv.motorLock.release()
             time.sleep(.001)
             SnakeEnv.motorLock.acquire()
-            self.currPosition = [*optiPositionCoord, optiAngle, *SnakeEnv.motorPosition]
+            self.currPosition = [*optiPositionCoord_global, optiAngle, *SnakeEnv.motorPosition]
 
         SnakeEnv.prevPos = SnakeEnv.optiPosition[0:3]
 
@@ -287,7 +291,7 @@ class SnakeEnv(gymnasium.Env):
         SnakeEnv.optiLock.release()
         
         time.sleep(.001)
-        return self.currPosition, optiPositionCoord_global
+        return self.currPosition
     
     def writeAction(self, actionToWrite):
         posTo = actionToWrite
@@ -296,7 +300,7 @@ class SnakeEnv(gymnasium.Env):
         SnakeEnv.motors.writePos(posTo)
         SnakeEnv.motorLock.release()
 
-        time.sleep(.3) # sleep to allow motors to get to position
+        time.sleep(.45) # sleep to allow motors to get to position
 
 
     def getTorque(self):
@@ -327,13 +331,13 @@ class SnakeEnv(gymnasium.Env):
     def optiPos():
         SnakeEnv.optiLock.acquire()
         SnakeEnv.optiRelPos, heading = SnakeEnv.opti.optiTrackGetPos()
-        if time.time() - SnakeEnv.bla > 0.02:
-            print(time.time() - SnakeEnv.bla)
+        #if time.time() - SnakeEnv.bla > 0.02:
+        #    print(time.time() - SnakeEnv.bla)
         SnakeEnv.optiPosition = [*SnakeEnv.optiRelPos, *heading]
         #print(SnakeEnv.optiPosition)
         SnakeEnv.optiLock.release()
         time.sleep(.001) # changed from .008
-        SnakeEnv.bla = time.time()
+        #SnakeEnv.bla = time.time()
         return
     
     @staticmethod

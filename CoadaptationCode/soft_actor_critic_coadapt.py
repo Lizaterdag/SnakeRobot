@@ -260,10 +260,11 @@ class SoftActorCriticCoadapt(RLAlgorithm):
             input_size=obs_dim + action_dim,
             output_size=1,
         ).to(device=ptu.device)
+        #TODO: check if action_dim is 18
         policy = TanhGaussianPolicy(
             hidden_sizes=hidden_sizes,
             obs_dim=obs_dim,
-            action_dim=18,
+            action_dim=action_dim,
         ).to(device=ptu.device)
 
         clip_value = 1.0

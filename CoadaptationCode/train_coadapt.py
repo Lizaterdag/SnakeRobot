@@ -193,6 +193,7 @@ class Train():
                 reward = np.array([reward])
                 
                 # add replay sample
+                print(f'action shape: {action.shape}')
                 self.replay.add_sample(observation=state, action=action, reward=reward, next_observation=next_state,
                    terminal=terminal, env_info={})
 

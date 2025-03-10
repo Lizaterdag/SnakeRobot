@@ -80,8 +80,8 @@ class SnakeEnv(gymnasium.Env):
 
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(10+7,), dtype= 'float32') # data type is float32
         
-        self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(6,), dtype='float32') # continuous action space
-
+        #self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(6,), dtype='float32') # continuous action space
+        self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(18,), dtype='float32')
         self.targetPositionX = 100.0 # position that can't be reached, think about changing or getting rid of this
 
                
@@ -111,10 +111,29 @@ class SnakeEnv(gymnasium.Env):
         
      
     def step(self, action):
-        actionForMotors = self.denormalizeAction(action)
-        print(actionForMotors)
 
-        self.writeAction(actionForMotors)
+        assert len(action) == 18, "Action space must now be 18 values (6 motors x 3 timesteps)."
+
+        # Split action into 3 consecutive timesteps
+        action_t = action[0:6]   # Action at timestep t
+        action_t1 = action[6:12]  # Action at timestep t+1
+        action_t2 = action[12:18]  # Action at timestep t+2
+
+        # Execute each action sequentially
+        for sub_action in [action_t, action_t1, action_t2]:
+            actionForMotors = self.denormalizeAction(sub_action)
+            print(actionForMotors)
+            self.writeAction(actionForMotors)
+            time.sleep(0.1)  # Short delay between individual actions
+
+
+        # actionForMotors = self.denormalizeAction(action)
+        # print(actionForMotors)
+
+        # self.writeAction(actionForMotors)
+
+        # Wait 0.5s before retrieving the next batch of actions
+        time.sleep(0.5)
 
         nextObs = self._get_obs()
 
@@ -167,7 +186,6 @@ class SnakeEnv(gymnasium.Env):
 
         # update previous position and action
         self.prevPos = currXPos
-        self.prevAction = action  # Store previous action for smoothness calculation
 
         # add design info to observation
 

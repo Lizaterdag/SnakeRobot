@@ -263,7 +263,7 @@ class SoftActorCriticCoadapt(RLAlgorithm):
         policy = TanhGaussianPolicy(
             hidden_sizes=hidden_sizes,
             obs_dim=obs_dim,
-            action_dim=action_dim,
+            action_dim=18,
         ).to(device=ptu.device)
 
         clip_value = 1.0

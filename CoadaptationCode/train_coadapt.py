@@ -30,8 +30,8 @@ class Train():
         self._reward_scale = 1.0
         self._episode_length = 150 # number of timesteps per episode
         self.episode_counter = 0
-        self.episodes_before_training = 10 # number of episodes before training to fill the replay buffer
-        self.episode_iterations = 30 # number of episodes per design
+        self.episodes_before_training = 2 # number of episodes before training to fill the replay buffer
+        self.episode_iterations = 50 # number of episodes per design
         self.design_cylces = 20 # total number of design cycles
 
         self.episodeCumulativeRewards = []  # Stores cumulative rewards per episode
@@ -57,7 +57,7 @@ class Train():
 
         # set up design variables
         self.do_alg = PSO_batch(self.replay, self.env)
-        self.design_counter = 2
+        self.design_counter = 3
         self.episode_counter = 0
         self.data_design_type = 'Initial'
         
@@ -193,6 +193,7 @@ class Train():
                 reward = np.array([reward])
                 
                 # add replay sample
+
                 print(f'action shape: {action.shape}')
                 self.replay.add_sample(observation=state, action=action, reward=reward, next_observation=next_state,
                    terminal=terminal, env_info={})
@@ -374,7 +375,8 @@ class Train():
         self.initialize_episode() 
 
         
-        for _ in range(self.episode_counter, self.episode_iterations): # train motor controls for this design iteration #added self.episode_counter
+        #for _ in range(self.episode_counter, self.episode_iterations): # train motor controls for this design iteration #added self.episode_counter
+        for _ in range(self._episode_length*3):
             self.currEp = _
             print('in initial design loop')
             self.train_single_iteration()

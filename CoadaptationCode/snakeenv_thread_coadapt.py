@@ -80,8 +80,9 @@ class SnakeEnv(gymnasium.Env):
 
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(10+7,), dtype= 'float32') # data type is float32
         
-        #self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(6,), dtype='float32') # continuous action space
-        self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(18,), dtype='float32')
+        self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(6,), dtype='float32') # continuous action space
+        #self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(18,), dtype='float32')
+
         self.targetPositionX = 100.0 # position that can't be reached, think about changing or getting rid of this
 
                
@@ -112,30 +113,41 @@ class SnakeEnv(gymnasium.Env):
      
     def step(self, action):
 
-        assert len(action) == 18, "Action space must now be 18 values (6 motors x 3 timesteps)."
+        num_timesteps = 1  
+        assert len(action) == 6 * num_timesteps, f"Action space must now be {6 * num_timesteps} values ({6} motors × {num_timesteps} timesteps)."
 
-        # Split action into 3 consecutive timesteps
-        action_t = action[0:6]   # Action at timestep t
-        action_t1 = action[6:12]  # Action at timestep t+1
-        action_t2 = action[12:18]  # Action at timestep t+2
+        # Split action into multiple consecutive timesteps
+        actions = [action[i * 6: (i + 1) * 6] for i in range(num_timesteps)]
 
-        # Execute each action sequentially
-        for sub_action in [action_t, action_t1, action_t2]:
+        for sub_action in actions:
             actionForMotors = self.denormalizeAction(sub_action)
             print(actionForMotors)
             self.writeAction(actionForMotors)
-            time.sleep(0.1)  # Short delay between individual actions
-
-
-        # actionForMotors = self.denormalizeAction(action)
-        # print(actionForMotors)
-
-        # self.writeAction(actionForMotors)
 
         # Wait 0.5s before retrieving the next batch of actions
-        time.sleep(0.5)
+        for i in range(3):
+            nextObs = self._get_obs()
+        #time.sleep(.2)
 
-        nextObs = self._get_obs()
+        for i in range(5):
+            nextObs = self._get_obs()
+            #print(nextObs)
+        tmp_pos = copy.deepcopy(nextObs)
+        nextObs[0] = nextObs[0] - self._prev_obs[0]
+        nextObs[1] = nextObs[1] - self._prev_obs[1]
+        nextObs[2] = nextObs[2] - self._prev_obs[2]
+
+        while nextObs[0] == 0. and nextObs[1] == 0.:
+            nextObs = self._get_obs()
+            print(nextObs)
+            tmp_pos = copy.deepcopy(nextObs)
+            nextObs[0] = nextObs[0] - self._prev_obs[0]
+            nextObs[1] = nextObs[1] - self._prev_obs[1]
+            nextObs[2] = nextObs[2] - self._prev_obs[2]
+            print("im here")
+            print(nextObs[0], nextObs[1])
+
+        self._prev_obs = tmp_pos
 
         # Log global positions
         SnakeEnv.optiXTrack.append(SnakeEnv.optiRelPos[0])  # global x position of robot
@@ -144,34 +156,14 @@ class SnakeEnv(gymnasium.Env):
         # extract X position
         currXPos = nextObs[0]  # opti X position of the robot
 
-        #currXPos = global_pos[0]
-
         # # reward forward movement
-        # reward = (currXPos - self.prevPos) * self.rewardScale
-
+        reward = (currXPos - self.prevPos)
         #print("global pos")
         #print(global_pos)
 
-        max_distance = self.targetPositionX - (self.starting_position - 20) 
-        distance = abs(self.targetPositionX - currXPos)
-        reward = np.exp(1 - (distance / max_distance))
-
-        #reward = max_distance - distance
-
-        # if reward < 0:
-        #     reward = np.exp(reward)
-        # else:
-        #     reward = reward * 10
-
-
-        # Exponential transformation for small negative values
-        # if reward >= 0:
-        #     reward = (reward ** 2) * 100
-
-        # else:
-        #     reward = np.exp(5 * reward) * 50
-
-        #reward = max(reward, 0.1)
+        # max_distance = self.targetPositionX - (-0.7 - 20) 
+        # distance = abs(self.targetPositionX - currXPos)
+        # reward = np.exp(1 - (distance / max_distance))
 
         # check if the goal is reached
         terminated = currXPos > self.targetPositionX
@@ -193,7 +185,6 @@ class SnakeEnv(gymnasium.Env):
         print(f"Observation: {nextObs}")
 
         return np.array(nextObs), reward, terminated, truncated, info
-
     
     def reset(self, seed=None, options=None):
         # returns: observation of the initial state
@@ -235,12 +226,17 @@ class SnakeEnv(gymnasium.Env):
         # return current observation
         print("about to observe")  
         observation = self._get_obs(initial=True)
+        observation[0] = 0.
+        observation[1] = 0.
+        observation[2] = 0.
         SnakeEnv.enableMotorTorque()
         # DO NOT UNCOMMENT IN
 
         print('Observation: ', observation)
         self.starting_position = observation[0]
         self.prevPos = observation[0] # x position of observation
+
+        self._prev_obs = copy.deepcopy(observation)
 
 
         info = {'info': 0}
@@ -294,7 +290,7 @@ class SnakeEnv(gymnasium.Env):
         #    SnakeEnv.motorLock.release()
         #    time.sleep(.001)
         #    SnakeEnv.motorLock.acquire()
-        print('CHANGE')
+        #print('CHANGE')
         self.currPosition = [*optiPositionCoord_global, optiAngle, *SnakeEnv.motorPosition] # reads static variables that are being updated in the threads 
         
         while SnakeEnv.motorPosition == []:
@@ -318,7 +314,7 @@ class SnakeEnv(gymnasium.Env):
         SnakeEnv.motors.writePos(posTo)
         SnakeEnv.motorLock.release()
 
-        time.sleep(.45) # sleep to allow motors to get to position
+        time.sleep(.3) # sleep to allow motors to get to position
 
 
     def getTorque(self):
@@ -349,8 +345,7 @@ class SnakeEnv(gymnasium.Env):
     def optiPos():
         SnakeEnv.optiLock.acquire()
         SnakeEnv.optiRelPos, heading = SnakeEnv.opti.optiTrackGetPos()
-        #if time.time() - SnakeEnv.bla > 0.02:
-        #    print(time.time() - SnakeEnv.bla)
+        #print(time.time() - SnakeEnv.bla)
         SnakeEnv.optiPosition = [*SnakeEnv.optiRelPos, *heading]
         #print(SnakeEnv.optiPosition)
         SnakeEnv.optiLock.release()

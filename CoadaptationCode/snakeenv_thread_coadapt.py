@@ -35,6 +35,7 @@ class SnakeEnv(gymnasium.Env):
     opti = optitrack.Optitrack()
     motorLock = threading.Lock()
     optiLock = threading.Lock()
+    starting_angle = None
 
     bla = time.time()
 
@@ -76,6 +77,7 @@ class SnakeEnv(gymnasium.Env):
         self.rewardScale = 100 # scale rewards
         self.motorMin = 1422 #1500 #1422
         self.motorMax = 2674 #2500 #2673
+        
        
 
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(10+7,), dtype= 'float32') # data type is float32
@@ -133,15 +135,15 @@ class SnakeEnv(gymnasium.Env):
             nextObs = self._get_obs()
             #print(nextObs)
         tmp_pos = copy.deepcopy(nextObs)
-        nextObs[0] = nextObs[0] - self._prev_obs[0]
+        # nextObs[0] = nextObs[0] - self._prev_obs[0]
         nextObs[1] = nextObs[1] - self._prev_obs[1]
         nextObs[2] = nextObs[2] - self._prev_obs[2]
 
-        while nextObs[0] == 0. and nextObs[1] == 0.:
+        while (nextObs[0]- self._prev_obs[0]) == 0. and nextObs[1] == 0.:
             nextObs = self._get_obs()
             print(nextObs)
             tmp_pos = copy.deepcopy(nextObs)
-            nextObs[0] = nextObs[0] - self._prev_obs[0]
+            # nextObs[0] = nextObs[0] - self._prev_obs[0]
             nextObs[1] = nextObs[1] - self._prev_obs[1]
             nextObs[2] = nextObs[2] - self._prev_obs[2]
             print("im here")
@@ -157,13 +159,14 @@ class SnakeEnv(gymnasium.Env):
         currXPos = nextObs[0]  # opti X position of the robot
 
         # # reward forward movement
-        reward = (currXPos - self.prevPos)
+        # reward = max([currXPos*0.05,0.]) * (.3- abs(nextObs[3]))  #(currXPos - self.prevPos)
         #print("global pos")
         #print(global_pos)
 
-        # max_distance = self.targetPositionX - (-0.7 - 20) 
-        # distance = abs(self.targetPositionX - currXPos)
-        # reward = np.exp(1 - (distance / max_distance))
+        max_distance = 40 #self.targetPositionX - ( 20) 
+        distance = abs(self.targetPositionX - currXPos)
+        print("reward {}".format(np.exp(1 - (distance / max_distance))))
+        reward = np.exp(1 - (distance / max_distance)) +  (.3- abs(nextObs[3]))
 
         # check if the goal is reached
         terminated = currXPos > self.targetPositionX
@@ -226,7 +229,7 @@ class SnakeEnv(gymnasium.Env):
         # return current observation
         print("about to observe")  
         observation = self._get_obs(initial=True)
-        observation[0] = 0.
+        # observation[0] = 0.
         observation[1] = 0.
         observation[2] = 0.
         SnakeEnv.enableMotorTorque()
@@ -283,7 +286,13 @@ class SnakeEnv(gymnasium.Env):
         #optiPositionCoord = [(curr- prev)*100 for curr, prev in zip(SnakeEnv.optiPosition[0:3], SnakeEnv.prevPos)] # adjusting position to measure previous
         optiPositionCoord_global = [(curr)*100 for curr, _ in zip(SnakeEnv.optiPosition[0:3], SnakeEnv.prevPos)]
         #optiAngle = [i/100 for i in SnakeEnv.optiPosition[3:6]] # only accessing y heading 
-        optiAngle = SnakeEnv.optiPosition[4]/100
+        optiAngle = SnakeEnv.optiPosition[5] #/100
+        if self.starting_angle is None:
+            self.starting_angle = optiAngle
+
+        angle = self.starting_angle - optiAngle
+        optiAngle = float((angle + 180.) % 360) - 180.
+        optiAngle = optiAngle/180.
         # print('MOTOR POS', SnakeEnv.motorPosition)
 
         #while SnakeEnv.motorPosition == []:

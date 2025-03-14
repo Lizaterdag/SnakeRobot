@@ -43,21 +43,21 @@ def plot_timestep_reward(csv_file, episode_num):
     plt.show()
 
 if __name__ == "__main__":
-    file_names = ['2025_03_13-14_59_50Rewards_Design3']  # Replace with your actual file names
-    
-    for file_path in file_names:
-        counter = 3
-        df = pd.read_csv(file_path, delimiter='\t')  # Change delimiter if needed
-        df.to_csv(f'output_{counter}.csv', index=False)
+    file_names = ['/home/liza/SnakeRobot/CoadaptationCode/2025_03_14-11_06_10Rewards_Design3']  # Replace with your actual file names
+    for i in range(26,50):
+        for file_path in file_names:
+            counter = 4
+            df = pd.read_csv(file_path, delimiter='\t')  # Change delimiter if needed
+            df.to_csv(f'output_{counter}.csv', index=False)
 
-    #put all csv files in a list
-    designs = ['output_4.csv']
-    for design in designs:
-        with open(design, 'r') as file :
-            filedata = file.read()
+        #put all csv files in a list
+            designs = ['output_4.csv']
+        
+            with open(designs[0], 'r') as file :
+                filedata = file.read()
 
-            filedata = filedata.replace('"', '')
-            with open(design, 'w') as file:
-                file.write(filedata) 
-        #plot_timestep_reward(f'output_{counter}.csv', episode_num=10)
-        plot_cumulative_reward('output_4.csv')
+                filedata = filedata.replace('"', '')
+                with open(designs[0], 'w') as file:
+                    file.write(filedata) 
+            plot_timestep_reward(f'output_4.csv', episode_num=i)
+            plot_cumulative_reward('output_4.csv')

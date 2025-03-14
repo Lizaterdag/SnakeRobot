@@ -168,13 +168,14 @@ class Optitrack:
             
             # convert quaternion
             rotation = Rotation.from_quat(quaternion) # x y z w
-            eulerRot = rotation.as_euler('xyz', degrees=True) # returning in degrees
-            normalizedOptiAngle = [2*(pos-self.optiAngMin)/self.optiAngRange-1 for pos in eulerRot]
+            # eulerRot = rotation.as_euler('xyz', degrees=True) # returning in degrees
+            # normalizedOptiAngle = [2*(pos-self.optiAngMin)/self.optiAngRange-1 for pos in eulerRot]
+            normalizedOptiAngle = rotation.as_euler('xzy', degrees=True)
             
             #result = [*coord, *eulerRot]
             result = [*normalizedOptiCoord, *normalizedOptiAngle] # return normalized data
          
-            return normalizedOptiCoord, eulerRot
+            return normalizedOptiCoord, normalizedOptiAngle #eulerRot
             
         except natnet.DiscoveryError as e:
             print('Error:', e)

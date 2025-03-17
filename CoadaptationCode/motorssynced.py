@@ -41,7 +41,7 @@ class MotorsSynced:
         # set motor variables
         self.BAUDRATE                       = 2000000 #57600 #2000000
         self.PROTOCOL_VERSION               = 2.0 # make sure motors are on this protocol version
-        self.DXL_ID                         = [0,2,3,4,5,6]
+        self.DXL_ID                         = list(reversed([0,2,3,4,5,6]))
         #[0,2,3,4,5,6]# IDs for motors, have these match to IDs set in dynamixel software
         self.ADDR_MX_TORQUE_ENABLE          = 64 # this ADDR value changes for different dynamixel models: https://emanual.robotis.com/docs/en/dxl/
         self.COMM_SUCCESS                   = 0 # variable for if message being sent to motors was successfully sent

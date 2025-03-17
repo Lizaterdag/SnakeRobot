@@ -376,7 +376,7 @@ class Train():
 
         
         #for _ in range(self.episode_counter, self.episode_iterations): # train motor controls for this design iteration #added self.episode_counter
-        for _ in range(self._episode_length*3):
+        for _ in range(self._episode_length):
             self.currEp = _
             print('in initial design loop')
             self.train_single_iteration()

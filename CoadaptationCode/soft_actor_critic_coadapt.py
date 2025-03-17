@@ -45,8 +45,8 @@ class SoftActorCriticCoadapt(RLAlgorithm):
         self._pop_policy = networks['population']['policy']
 
         # define training parameters
-        self._batch_size = 128
-        self._nmbr_ind_updates = 300 # was 1000 TODO: LOOK AT EHAT TO SET THIS TO number of gradietn updates?
+        self._batch_size = 64
+        self._nmbr_ind_updates = 1000 # was 1000 TODO: LOOK AT EHAT TO SET THIS TO number of gradietn updates?
         self._nmbr_pop_updates = 100 # was 250 number of gradietn updates? per episode, was 300
 
         # set up trainer 
@@ -62,8 +62,8 @@ class SoftActorCriticCoadapt(RLAlgorithm):
             reward_scale=1.0,
 
             
-            policy_lr= 1E-5, # 1E-3,
-            qf_lr= 1E-5, # 1E-3,
+            policy_lr= 1E-3, # 1E-5,
+            qf_lr= 1E-3, # 1E-5,
             optimizer_class=optim.Adam, 
 
             soft_target_tau=.01,
@@ -73,7 +73,7 @@ class SoftActorCriticCoadapt(RLAlgorithm):
 
             use_automatic_entropy_tuning=False,
             target_entropy=None,
-            alpha=.2  # was .01
+            alpha=.01  # was .01
 
         )
 
@@ -86,8 +86,8 @@ class SoftActorCriticCoadapt(RLAlgorithm):
             target_qf2=self._pop_qf2_target,
 
             
-            policy_lr= 1E-5, # 1E-3,
-            qf_lr= 1E-5, # 1E-3,
+            policy_lr= 1E-3, # 1E-5,
+            qf_lr= 1E-3, # 1E-5,
             optimizer_class=optim.Adam, 
 
             soft_target_tau=.01,
@@ -97,7 +97,7 @@ class SoftActorCriticCoadapt(RLAlgorithm):
 
             use_automatic_entropy_tuning=False,
             target_entropy=None,
-            alpha=.2  # was .01
+            alpha=.01  # was .01
 
         )
 

@@ -85,7 +85,7 @@ class SnakeEnv(gymnasium.Env):
         self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(6,), dtype='float32') # continuous action space
         #self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(18,), dtype='float32')
 
-        self.targetPositionX = 100.0 # position that can't be reached, think about changing or getting rid of this
+        self.targetPositionX = -100.0 # position that can't be reached, think about changing or getting rid of this
 
                
         # init other things
@@ -169,7 +169,7 @@ class SnakeEnv(gymnasium.Env):
         reward = np.exp(1 - (distance / max_distance)) +  (.3- abs(nextObs[3]))
 
         # check if the goal is reached
-        terminated = currXPos > self.targetPositionX
+        terminated = currXPos < self.targetPositionX
 
         truncated = False
         info = {'info': 0}

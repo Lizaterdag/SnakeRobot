@@ -45,7 +45,7 @@ class SoftActorCriticCoadapt(RLAlgorithm):
         self._pop_policy = networks['population']['policy']
 
         # define training parameters
-        self._batch_size = 64
+        self._batch_size = 32
         self._nmbr_ind_updates = 1000 # was 1000 TODO: LOOK AT EHAT TO SET THIS TO number of gradietn updates?
         self._nmbr_pop_updates = 100 # was 250 number of gradietn updates? per episode, was 300
 

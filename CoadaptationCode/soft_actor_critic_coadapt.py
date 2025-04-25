@@ -62,8 +62,8 @@ class SoftActorCriticCoadapt(RLAlgorithm):
             reward_scale=1.0,
 
             
-            policy_lr= 1E-3, # 1E-5,
-            qf_lr= 1E-3, # 1E-5,
+            policy_lr= 1E-3, #5E-4, # 1E-5,
+            qf_lr= 1E-3, #5E-4, # 1E-5,
             optimizer_class=optim.Adam, 
 
             soft_target_tau=.01,
@@ -86,8 +86,8 @@ class SoftActorCriticCoadapt(RLAlgorithm):
             target_qf2=self._pop_qf2_target,
 
             
-            policy_lr= 1E-3, # 1E-5,
-            qf_lr= 1E-3, # 1E-5,
+            policy_lr=  1E-3, #5E-4, #1E-3, # 1E-5,
+            qf_lr= 1E-3, #5E-4, #1E-3, # 1E-5,
             optimizer_class=optim.Adam, 
 
             soft_target_tau=.01,
@@ -123,8 +123,8 @@ class SoftActorCriticCoadapt(RLAlgorithm):
             reward_scale=1.0,
 
             
-            policy_lr= 1E-5, # 1E-3,
-            qf_lr= 1E-5, # 1E-3,
+            policy_lr= 1E-3, #5E-4, #1E-3, # 1E-5,
+            qf_lr= 1E-3, #5E-4, #1E-3, # 1E-5,
             optimizer_class=optim.Adam, 
 
             soft_target_tau=.01,
@@ -134,7 +134,7 @@ class SoftActorCriticCoadapt(RLAlgorithm):
 
             use_automatic_entropy_tuning=False,
             target_entropy=None,
-            alpha=.2  # was .01
+            alpha=.01  # was .01
         )
 
         self._networks['individual'] 

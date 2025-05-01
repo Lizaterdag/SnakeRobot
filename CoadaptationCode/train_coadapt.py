@@ -28,7 +28,7 @@ class Train():
         self.env = gym.make("SnakeRobot")
     
         self._reward_scale = 1.0
-        self._episode_length = 150 # number of timesteps per episode
+        self._episode_length = 200 # number of timesteps per episode
         self.episode_counter = 0
         self.episodes_before_training = 4 # number of episodes before training to fill the replay buffer
         self.episode_iterations = 50 # number of episodes per design

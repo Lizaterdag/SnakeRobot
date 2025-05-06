@@ -1,4 +1,5 @@
 # read motors
+import json
 import gymnasium as gym
 import matplotlib.pyplot as plt
 from soft_actor_critic_coadapt import SoftActorCriticCoadapt
@@ -28,8 +29,9 @@ class Train():
         self.env = gym.make("SnakeRobot")
     
         self._reward_scale = 1.0
-        self._episode_length = 200 # number of timesteps per episode
-        self.episode_counter = 0
+        self.optimized_params = None
+        self._episode_length = 20 # number of timesteps per episode
+        self.episode_counter = None
         self.episodes_before_training = 4 # number of episodes before training to fill the replay buffer
         self.episode_iterations = 50 # number of episodes per design
         self.design_cylces = 20 # total number of design cycles
@@ -57,12 +59,11 @@ class Train():
 
         # set up design variables
         self.do_alg = PSO_batch(self.replay, self.env)
-        self.design_counter = 3
-        self.episode_counter = 0
+        self.design_counter = 1
         self.data_design_type = 'Initial'
         
 
-        self.date = datetime.now().strftime("%Y_%m_%d-%H_%M_%S") # for files
+        self.date = datetime.now().strftime("%Y_%m_%d") # for files
         
         
 
@@ -92,7 +93,7 @@ class Train():
         self.poppolicyloss = []
 
         # setting up files and file names
-        self.date = datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
+        self.date = datetime.now().strftime("%Y_%m_%d")
         name = "Rewards_Design{}".format(str(self.design_counter))
         self.filename = self.date+name
         name = "Losses_Design{}".format(str(self.design_counter))
@@ -132,6 +133,13 @@ class Train():
             buffer.
 
             """
+
+            self.stateList = [[] for i in range(0,17)]
+            self.actionList = [[] for i in range(0,6)]
+            self.timestepRewards = []
+            self.cumulativeRewards = []
+            self.epList = []
+            self.timesteps = []
 
             # reset environment
             state, info = self.env.reset()
@@ -247,8 +255,8 @@ class Train():
         self.replay.reset_individual_buffer()
 
         self.data_rewards = []
-        self.episode_counter = 0
-
+        if self.episode_counter == 0:  # only reset if not resuming
+            self.episode_counter = 0
     
     def first_train_op(self):
         print('in first train op')
@@ -376,7 +384,7 @@ class Train():
 
         
         #for _ in range(self.episode_counter, self.episode_iterations): # train motor controls for this design iteration #added self.episode_counter
-        for _ in range(self._episode_length):
+        for _ in range(self.episode_iterations):
             self.currEp = _
             print('in initial design loop')
             self.train_single_iteration()
@@ -413,12 +421,23 @@ class Train():
         torch.save(self.rl_alg._pop_qf2, 'results/pop_qf2_{}_Design{}_ep{}.pt'.format(self.date, self.design_counter, self.episode_counter))
         torch.save(self.rl_alg._pop_qf1_target, 'results/pop_qf1_tar_{}_Design{}_ep{}.pt'.format(self.date, self.design_counter, self.episode_counter))
         torch.save(self.rl_alg._pop_qf2_target, 'results/pop_qf2_tar_{}_Design{}_ep{}.pt'.format(self.date, self.design_counter, self.episode_counter))
-     
-    
+        
+        metadata = {
+            'design_counter': self.design_counter,
+            'episode_counter': self.episode_counter,
+            'optimized_params': getattr(self, 'optimized_params', None) 
+        }
+
+        with open(f'results/{self.date}_Design{self.design_counter}_ep{self.episode_counter}_metadata.json', 'w') as f:
+            json.dump(metadata, f)
+            
+        print(f"Successfully saved networks for design {self.design_counter} and episode {self.episode_counter}")    
+
     def logData(self):
         xPositionList, yPositionList = SnakeEnv.returnOptiXList()
         rewardDF = pd.DataFrame()
-        rewardDF['Episode'] = self.epList
+
+        rewardDF['Episode'] = [self.episode_counter] * len(self.timesteps)
         rewardDF['Timestep'] = self.timesteps
         rewardDF['X_Position']= xPositionList # added this, need to see if it works
         rewardDF['Y_Position']= yPositionList # added this, need to see if it works
@@ -455,7 +474,10 @@ class Train():
         rewardDF['Plate6'] =  self.stateList[15]
         rewardDF['Plate7'] =  self.stateList[16]
 
-        rewardDF.to_csv(self.filename, index=False)
+        if not os.path.isfile(self.filename):
+            rewardDF.to_csv(self.filename, index=False)
+        else:
+            rewardDF.to_csv(self.filename, index=False, mode='a', header=False)
 
     def logTrainLoss(self):
         lossDF = pd.DataFrame()
@@ -470,9 +492,52 @@ class Train():
         lossDF['Pop_Policy_Loss'] = self.poppolicyloss
         lossDF.to_csv(self.lossFilename, index=False)
 
-    def load_networks(self, path):
-        # can create code here to load networks
-        pass
+    def load_networks(self, base_path, checkpoint_prefix):
+        self.rl_alg._ind_policy.load_state_dict(torch.load(
+            f'{base_path}/ind_policy_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._ind_qf1.load_state_dict(torch.load(
+            f'{base_path}/ind_qf1_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._ind_qf2.load_state_dict(torch.load(
+            f'{base_path}/ind_qf2_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._ind_qf1_target.load_state_dict(torch.load(
+            f'{base_path}/ind_qf1_tar_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._ind_qf2_target.load_state_dict(torch.load(
+            f'{base_path}/ind_qf2_tar_{checkpoint_prefix}.pt'
+        ).state_dict())
+
+        self.rl_alg._pop_policy.load_state_dict(torch.load(
+            f'{base_path}/pop_policy_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._pop_qf1.load_state_dict(torch.load(
+            f'{base_path}/pop_qf1_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._pop_qf2.load_state_dict(torch.load(
+            f'{base_path}/pop_qf2_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._pop_qf1_target.load_state_dict(torch.load(
+            f'{base_path}/pop_qf1_tar_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._pop_qf2_target.load_state_dict(torch.load(
+            f'{base_path}/pop_qf2_tar_{checkpoint_prefix}.pt'
+        ).state_dict())
+
+        print(f"Successfully loaded networks from checkpoint: {checkpoint_prefix}")
+
+        metadata_path = f'{base_path}/{checkpoint_prefix}_metadata.json'
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+            self.design_counter = metadata['design_counter']
+            self.episode_counter = metadata['episode_counter']
+            self.optimized_params = metadata.get('optimized_params', None)
+            print(f"Restored design_counter={self.design_counter}, episode_counter={self.episode_counter}")
+        else:
+            print("No metadata file found; counters not restored.")
+
 
 
     def logEpisodeRewards(self):
@@ -544,42 +609,44 @@ class Train():
 
 if __name__ == '__main__':
 
-    filename = "Design10CoptPopNetFeb20"
+    filename = "Design1CoptPopNetMay6"
     gc.collect()
     gc.set_threshold(0)
 
-    startTrainingSession = False # change this to false if not first time running training cycle
-    stopEvent = threading.Event() # event to stop threads
+    startTrainingSession = False
+    stopEvent = threading.Event()
 
     if os.path.exists(filename) and os.path.getsize(filename) > 0:
         with open(filename, "rb") as picklefile:
             trainingObj = pickle.load(picklefile)
         picklefile.close()
-
     else:
         print("Pickle file is missing or empty. Starting first time training")
         stopEvent = threading.Event()
-
-        # need to create new object since first time running code
         trainingObj = Train()
         optiLock = threading.Lock()
         motorLock = threading.Lock()
         trainingObj.passLocks(optiLock, motorLock)
 
+        # if resuming from a checkpoint:
+        base_path = "/home/liza/SnakeRobot/CoadaptationCode/results"
+        checkpoint_prefix = "2025_05_06_Design1_ep22"
 
-    # run object from current/last state
+        #set to false if new training starts
+        resuming_from_checkpoint = True  
+
+        if resuming_from_checkpoint:
+            trainingObj.load_networks(base_path, checkpoint_prefix)
+        else:
+            trainingObj.episode_counter = 0
+            print("Starting fresh: episode_counter set to 0")
+
+    # run threads as before
     motorThread = threading.Thread(target=trainingObj.motorPos, args=(stopEvent,)) 
     optiThread = threading.Thread(target=trainingObj.optiPos, args=(stopEvent,))
     trainingloopThread = threading.Thread(target=trainingObj.run, args=(stopEvent,))
 
-
-    # start threads
     motorThread.start()
     optiThread.start() 
-    trainingloopThread.start() # start this thread last so can populate motor and opti data
+    trainingloopThread.start()
     trainingloopThread.join()
-    
-    # picklefile = open('Design10CoptPopNetFeb20', 'wb')# open pickle file you want to dump/write to 
-    # print(type(trainingObj))
-    # pickle.dump(trainingObj, picklefile) # save object to file
-    # picklefile.close() # close file

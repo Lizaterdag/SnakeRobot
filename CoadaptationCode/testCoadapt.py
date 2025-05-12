@@ -50,6 +50,8 @@ torch.use_deterministic_algorithms(True)
 # upload policy
 #policy = PolicyNetwork(state_dim=17,action_dim=6)
 policy = torch.load('/home/liza/SnakeRobotInternal/Design_Networks/ind_policy_2024_06_11-17_18_08_Design5_ep35.pt', map_location=torch.device('cpu')) # may need to change this
+#maybe also load self.replay._env = self.env
+
 print('WHAT IS POLICY', isinstance(policy, torch.nn.Module))
 policy.eval()
 filename = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")+'Design1Policy41Trained_Rewards'

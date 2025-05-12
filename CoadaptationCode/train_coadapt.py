@@ -430,14 +430,127 @@ class Train():
 
         with open(f'results/{self.date}_Design{self.design_counter}_ep{self.episode_counter}_metadata.json', 'w') as f:
             json.dump(metadata, f)
-            
-        print(f"Successfully saved networks for design {self.design_counter} and episode {self.episode_counter}")    
+
+        self.save_replay(f'results/replay_{self.date}_Design{self.design_counter}_ep{self.episode_counter}.pt')
+
+        print(f"saved networks for design {self.design_counter} and episode {self.episode_counter}")    
+
+    def load_networks(self, base_path, checkpoint_prefix):
+        self.rl_alg._ind_policy.load_state_dict(torch.load(
+            f'{base_path}/ind_policy_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._ind_qf1.load_state_dict(torch.load(
+            f'{base_path}/ind_qf1_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._ind_qf2.load_state_dict(torch.load(
+            f'{base_path}/ind_qf2_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._ind_qf1_target.load_state_dict(torch.load(
+            f'{base_path}/ind_qf1_tar_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._ind_qf2_target.load_state_dict(torch.load(
+            f'{base_path}/ind_qf2_tar_{checkpoint_prefix}.pt'
+        ).state_dict())
+
+        self.rl_alg._pop_policy.load_state_dict(torch.load(
+            f'{base_path}/pop_policy_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._pop_qf1.load_state_dict(torch.load(
+            f'{base_path}/pop_qf1_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._pop_qf2.load_state_dict(torch.load(
+            f'{base_path}/pop_qf2_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._pop_qf1_target.load_state_dict(torch.load(
+            f'{base_path}/pop_qf1_tar_{checkpoint_prefix}.pt'
+        ).state_dict())
+        self.rl_alg._pop_qf2_target.load_state_dict(torch.load(
+            f'{base_path}/pop_qf2_tar_{checkpoint_prefix}.pt'
+        ).state_dict())
+
+        print("loaded networks from checkpoint: {checkpoint_prefix}")
+
+        metadata_path = f'{base_path}/{checkpoint_prefix}_metadata.json'
+
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+            self.design_counter = metadata['design_counter']
+            self.episode_counter = metadata['episode_counter']
+            self.optimized_params = metadata.get('optimized_params', None)
+            print(f"restored design_counter={self.design_counter}, episode_counter={self.episode_counter}")
+        else:
+            print("no metadata file found; counters not restored.")
+
+        replay_path = f'{base_path}/replay_{checkpoint_prefix}.pt'
+        if os.path.exists(replay_path):
+            self.load_replay(replay_path)
+            print("Replay contains", self.replay._individual_buffer._size, "steps")
+        else:
+            print("no replay buffer found.")
+
+
+
+    def save_replay(self, filepath):
+        """Save replay buffer content to disk."""
+
+        try:
+            buf = self.replay._individual_buffer
+            data = {
+                "observations": buf._observations,
+                "actions": buf._actions,
+                "rewards": buf._rewards,
+                "terminals": buf._terminals,
+                "next_observations": buf._next_obs,
+                "_top": buf._top,
+                "_size": buf._size,
+            }
+            torch.save(data, filepath)
+            print(f"saved replay buffer to {filepath}")
+        except Exception as e:
+            print(f"failed to save replay buffer: {e}")
+
+    def load_replay(self, filepath):
+        """Load replay buffer content from disk."""
+        try:
+            buf = self.replay._individual_buffer
+            data = torch.load(filepath)
+
+            buf._observations = data["observations"]
+            buf._actions = data["actions"]
+            buf._rewards = data["rewards"]
+            buf._terminals = data["terminals"]
+            buf._next_obs = data["next_observations"]
+            buf._top = data["_top"]
+            buf._size = data["_size"]
+
+            print(f"loaded replay buffer from {filepath} with {buf._size} samples")
+        except Exception as e:
+            print(f"failed to load replay buffer: {e}")
+
+
+
 
     def logData(self):
+
         xPositionList, yPositionList = SnakeEnv.returnOptiXList()
+        min_len = min(len(self.timesteps), len(xPositionList))
+
+        # trim all lists to the same length
+        self.timesteps = self.timesteps[:min_len]
+        self.timestepRewards = self.timestepRewards[:min_len]
+        self.cumulativeRewards = self.cumulativeRewards[:min_len]
+        xPositionList = xPositionList[:min_len]
+        yPositionList = yPositionList[:min_len]
+        self.epList = self.epList[:min_len]
+
+        for i in range(6):
+            self.actionList[i] = self.actionList[i][:min_len]
+        for i in range(17):
+            self.stateList[i] = self.stateList[i][:min_len]
         rewardDF = pd.DataFrame()
 
-        rewardDF['Episode'] = [self.episode_counter] * len(self.timesteps)
+        rewardDF['Episode'] = self.epList
         rewardDF['Timestep'] = self.timesteps
         rewardDF['X_Position']= xPositionList # added this, need to see if it works
         rewardDF['Y_Position']= yPositionList # added this, need to see if it works
@@ -474,10 +587,21 @@ class Train():
         rewardDF['Plate6'] =  self.stateList[15]
         rewardDF['Plate7'] =  self.stateList[16]
 
-        if not os.path.isfile(self.filename):
-            rewardDF.to_csv(self.filename, index=False)
+        current_episode = self.epList[0] if self.epList else -1
+
+        # read existing file if it exists and is valid
+        if os.path.isfile(self.filename):
+            try:
+                existing = pd.read_csv(self.filename)
+                # remove old entries of current episode
+                existing = existing[existing['Episode'] != current_episode]
+                updated = pd.concat([existing, rewardDF], ignore_index=True)
+                updated.to_csv(self.filename, index=False)
+            except pd.errors.EmptyDataError:
+                print(f"{self.filename} is empty. creating new.")
+                rewardDF.to_csv(self.filename, index=False)
         else:
-            rewardDF.to_csv(self.filename, index=False, mode='a', header=False)
+            rewardDF.to_csv(self.filename, index=False)
 
     def logTrainLoss(self):
         lossDF = pd.DataFrame()
@@ -491,52 +615,6 @@ class Train():
         lossDF['Pop_Q2_Loss'] = self.popq2loss
         lossDF['Pop_Policy_Loss'] = self.poppolicyloss
         lossDF.to_csv(self.lossFilename, index=False)
-
-    def load_networks(self, base_path, checkpoint_prefix):
-        self.rl_alg._ind_policy.load_state_dict(torch.load(
-            f'{base_path}/ind_policy_{checkpoint_prefix}.pt'
-        ).state_dict())
-        self.rl_alg._ind_qf1.load_state_dict(torch.load(
-            f'{base_path}/ind_qf1_{checkpoint_prefix}.pt'
-        ).state_dict())
-        self.rl_alg._ind_qf2.load_state_dict(torch.load(
-            f'{base_path}/ind_qf2_{checkpoint_prefix}.pt'
-        ).state_dict())
-        self.rl_alg._ind_qf1_target.load_state_dict(torch.load(
-            f'{base_path}/ind_qf1_tar_{checkpoint_prefix}.pt'
-        ).state_dict())
-        self.rl_alg._ind_qf2_target.load_state_dict(torch.load(
-            f'{base_path}/ind_qf2_tar_{checkpoint_prefix}.pt'
-        ).state_dict())
-
-        self.rl_alg._pop_policy.load_state_dict(torch.load(
-            f'{base_path}/pop_policy_{checkpoint_prefix}.pt'
-        ).state_dict())
-        self.rl_alg._pop_qf1.load_state_dict(torch.load(
-            f'{base_path}/pop_qf1_{checkpoint_prefix}.pt'
-        ).state_dict())
-        self.rl_alg._pop_qf2.load_state_dict(torch.load(
-            f'{base_path}/pop_qf2_{checkpoint_prefix}.pt'
-        ).state_dict())
-        self.rl_alg._pop_qf1_target.load_state_dict(torch.load(
-            f'{base_path}/pop_qf1_tar_{checkpoint_prefix}.pt'
-        ).state_dict())
-        self.rl_alg._pop_qf2_target.load_state_dict(torch.load(
-            f'{base_path}/pop_qf2_tar_{checkpoint_prefix}.pt'
-        ).state_dict())
-
-        print(f"Successfully loaded networks from checkpoint: {checkpoint_prefix}")
-
-        metadata_path = f'{base_path}/{checkpoint_prefix}_metadata.json'
-        if os.path.exists(metadata_path):
-            with open(metadata_path, 'r') as f:
-                metadata = json.load(f)
-            self.design_counter = metadata['design_counter']
-            self.episode_counter = metadata['episode_counter']
-            self.optimized_params = metadata.get('optimized_params', None)
-            print(f"Restored design_counter={self.design_counter}, episode_counter={self.episode_counter}")
-        else:
-            print("No metadata file found; counters not restored.")
 
 
 
@@ -630,10 +708,11 @@ if __name__ == '__main__':
 
         # if resuming from a checkpoint:
         base_path = "/home/liza/SnakeRobot/CoadaptationCode/results"
-        checkpoint_prefix = "2025_05_06_Design1_ep22"
+        #change name
+        checkpoint_prefix = "2025_05_07_Design1_ep22"
 
         #set to false if new training starts
-        resuming_from_checkpoint = True  
+        resuming_from_checkpoint = False  
 
         if resuming_from_checkpoint:
             trainingObj.load_networks(base_path, checkpoint_prefix)

@@ -1,6 +1,7 @@
 from replaybuffer import EnvReplayBuffer
 from rlkit.data_management.replay_buffer import ReplayBuffer
 import numpy as np
+import torch
 
 class CoadaptReplayBuffer(ReplayBuffer):
     def __init__(
@@ -25,7 +26,52 @@ class CoadaptReplayBuffer(ReplayBuffer):
         self._population_buffer = EnvReplayBuffer(env=self._env, max_replay_buffer_size= self._max_replay_buffer_size_population)
         self._init_state_buffer = EnvReplayBuffer(env=self._env, max_replay_buffer_size= self._max_replay_buffer_size_population)
     
-    
+    # def __getstate__(self):
+    #     state = self.__dict__.copy()
+    #     # remove env from state to make it picklable
+    #     if 'env' in state:
+    #         state['env'] = None
+    #     if '_env' in state:
+    #         state['_env'] = None
+    #     return state
+
+    # def __setstate__(self, state):
+    #     self.__dict__.update(state)
+    #     # reset of env
+    #     self.env = None
+    #     self._env = None
+
+    def dump(self, filepath: str):
+        """Safely save the replay buffer to a file, excluding non-pickleable items."""
+        safe_dict = {}
+
+        # only copy safe items
+        for k, v in self.__dict__.items():
+            if "env" in k or "lock" in k or "socket" in str(type(v)):
+                continue
+            try:
+                torch.save(v, filepath + ".tmp")  # test if it's savable
+                safe_dict[k] = v
+            except Exception as e:
+                print(f"skipping key '{k}' in replay buffer (unsavable): {e}")
+
+        torch.save({'buffer': safe_dict}, filepath)
+        print(f"replay buffer saved to {filepath}")
+
+    @classmethod
+    def load(cls, filepath: str, env=None):
+        """Load the replay buffer and reattach the environment."""
+        saved = torch.load(filepath)
+        buffer = cls.__new__(cls)
+        buffer.__dict__.update(saved['buffer'])
+
+        # restore env manually
+        buffer.env = env
+        buffer._env = env
+        print(f"replay buffer loaded from {filepath}")
+        return buffer
+
+
     def add_sample(self, observation, action, reward, terminal,
                    next_observation, **kwargs):
         self._individual_buffer.add_sample(observation=observation, action=action, reward=reward, terminal=terminal, next_observation=next_observation, **kwargs)

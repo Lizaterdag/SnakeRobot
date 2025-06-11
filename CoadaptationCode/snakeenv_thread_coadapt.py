@@ -41,15 +41,19 @@ class SnakeEnv(gymnasium.Env):
 
 
     '''
-       Robot has 6 motors and 7 snake segments
-       Action Space: 6
+       Robot has 7 motors and 8 snake segments
+       Action Space: 7
        Observation Space: 12 from snake robot + 7 from design 
     '''
 
     # setting up design framework
-    current_design = [1.80] * 7 # put initial length in here, 6 links right now!
-    design_parameter_bounds = [(.45, 3.60)]*7 # the bounds of how small and large a variable can be 
-        
+    #TODO: make it 1.80 for 1 segment
+    current_design = [1.80] # put initial length in here, 6 links right now!
+
+    #design_parameter_bounds = [(.45, 3.60)] # the bounds of how small and large a variable can be 
+
+    design_parameter_bounds = [(0,70),(2,7),(0,100),(0,1)] # angle of attack 0 to 70 deg, width attack 2mm to 7mm, infill 0% to 100%, material pla or tpu 
+
     # init_design_parameters = [
     #         [1.0] * 6
     #         [.5, .5, .5, .5, .5, .5]
@@ -57,19 +61,19 @@ class SnakeEnv(gymnasium.Env):
     #         [.75, .5, .75, .5, 1, 1]
     #     ] # NOTE: Change these depending on the design I am going to use
 
-    init_design_parameters = [
-        [1.80] * 7,
-        [.60] * 7,
-        [2.70] * 7,
-        [1.80, .60, 2.70, 1.80, .60, 2.70, 1.80],
-        [2.653, 1.280, 2.385, 3.191, 1.485, 2.175, .542],
+    # init_design_parameters = [
+    #     [1.80] * 8,
+    #     [.60] * 8,
+    #     [2.70] * 8,
+    #     [1.80, .60, 2.70, 1.80, .60, 2.70, 1.80,.60,],
+    #     [2.653, 1.280, 2.385, 3.191, 1.485, 2.175, .542],
 
-    ] # NOTE: Change these depending on the design I am going to use
+    # ] # NOTE: Change these depending on the design I am going to use
 
     config_numpy = np.array(current_design)
     
     
-    design_dims =  list(range(17-len(current_design), 17)) # 12+7
+    design_dims =  list(range(14-len(current_design), 15)) # either 14or 15
     print('design dimensions!', design_dims)
     
     def __init__(self):
@@ -80,9 +84,9 @@ class SnakeEnv(gymnasium.Env):
         
        
 
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(10+7,), dtype= 'float32') # data type is float32
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(10+9,), dtype= 'float32') # data type is float32
         
-        self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(6,), dtype='float32') # continuous action space
+        self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(7,), dtype='float32') # continuous action space
         #self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(18,), dtype='float32')
 
         self.targetPositionX = -100.0 # position that can't be reached, think about changing or getting rid of this
@@ -116,10 +120,10 @@ class SnakeEnv(gymnasium.Env):
     def step(self, action):
 
         num_timesteps = 1  
-        assert len(action) == 6 * num_timesteps, f"Action space must now be {6 * num_timesteps} values ({6} motors × {num_timesteps} timesteps)."
+        assert len(action) == 7 * num_timesteps, f"Action space must now be {7 * num_timesteps} values ({7} motors × {num_timesteps} timesteps)."
 
         # Split action into multiple consecutive timesteps
-        actions = [action[i * 6: (i + 1) * 6] for i in range(num_timesteps)]
+        actions = [action[i * 7: (i + 1) * 7] for i in range(num_timesteps)]
 
         for sub_action in actions:
             actionForMotors = self.denormalizeAction(sub_action)
@@ -177,7 +181,7 @@ class SnakeEnv(gymnasium.Env):
         print(f"Reward: {reward}")
 
         # Log data
-        self.df.loc[len(self.df.index)] = [actionForMotors, nextObs[0:6], nextObs[6:-1], reward]
+        self.df.loc[len(self.df.index)] = [actionForMotors, nextObs[0:7], nextObs[7:-1], reward]
 
         # update previous position and action
         self.prevPos = currXPos
@@ -209,8 +213,8 @@ class SnakeEnv(gymnasium.Env):
 
 
         # choose starting position of robot motors
-        #startPos = random.sample(range(self.motorMin, self.motorMax), 6)
-        startPos = [2048, 2048, 2048, 2048, 2048, 2048]
+        #startPos = random.sample(range(self.motorMin, self.motorMax), 7)
+        startPos = [2048, 2048, 2048, 2048, 2048, 2048, 2048]
         self.writeAction(startPos)
         SnakeEnv.disableMotorTorque()
         # choose new goal position? could randomize target position?

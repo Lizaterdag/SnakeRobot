@@ -21,30 +21,29 @@ class PSO_batch(Design_Optimization):
         initial_state = initial_state['observations']
         design_idx = SnakeEnv.get_design_dimensions()
 
-        def f_qval(x_input, **kwargs): # function to optimize
+        def f_qval(x_input, **kwargs):  # function to optimize
             shape = x_input.shape
-            print('SHAPE DONE')
             cost = np.zeros((shape[0],))
 
             with torch.no_grad():
                 for i in range(shape[0]):
-                    x = x_input[i:i+1,:]
+                    x = x_input[i]  # shape (4,)
                     state_batch = initial_state.copy()
-                    state_batch[:,design_idx] = x
+
                     network_input = torch.from_numpy(state_batch).to(device=ptu.device, dtype=torch.float32)
-                    action,_, _, _, _, _, _, _, = policy_network(network_input, deterministic=True)
+                    action_dist = policy_network(network_input)
+                    if isinstance(action_dist, tuple):
+                        action = action_dist[0]
+                    else:
+                        action = action_dist.sample()
                     output = q_network(network_input, action)
-                    print(output)
                     loss = -output.mean().sum()
-                    fval = float(loss.item())
-                    cost[i] = fval
-                    
+                    cost[i] = float(loss.item())
+
             return cost
 
-        # TODO: MODIFIED FROM ORIGINAL CHECK THAT WORKS
         lower_bounds = [] 
         upper_bounds = []
-
 
         lower_bounds = [l for l, _ in SnakeEnv.design_parameter_bounds]
         lower_bounds = np.array(lower_bounds)

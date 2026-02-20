@@ -1,5 +1,7 @@
+
 import natnet
-client = natnet.Client.connect("192.168.1.132")
+#client = natnet.Client.connect("192.168.1.132")
+client = natnet.Client.connect("10.0.10.2")
 print("lalala")
 #client = natnet.Client.connect()
 client.set_callback(

@@ -54,12 +54,12 @@ class SnakeEnv(gymnasium.Env):
 
     design_parameter_bounds = [(0,70),(2,7),(0,100),(0,1)] # angle of attack 0 to 70 deg, width attack 2mm to 7mm, infill 0% to 100%, material pla or tpu 
 
-    # init_design_parameters = [
-    #         [1.0] * 6
-    #         [.5, .5, .5, .5, .5, .5]
-    #         [.5, 1, .5, 1, .5, 1]
-    #         [.75, .5, .75, .5, 1, 1]
-    #     ] # NOTE: Change these depending on the design I am going to use
+    init_design_parameters = [
+            [1.0] * 6,
+            [.5, .5, .5, .5, .5, .5],
+            [.5, 1, .5, 1, .5, 1],
+            [.75, .5, .75, .5, 1, 1]
+            ] # NOTE: Change these depending on the design I am going to use
 
     # init_design_parameters = [
     #     [1.80] * 8,

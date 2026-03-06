@@ -73,14 +73,15 @@ class PSO_batch(Design_Optimization):
                         else:
                             action = action_dist.sample()
                         output = q_network(network_input, action)
-                        # lower cost = better in PSO, so negate predicted value.
-                        terrain_costs.append(float(-output.mean().item()))
+                        # J_t: predicted return for terrain t under candidate design.
+                        terrain_returns.append(float(output.mean().item()))
 
-                    terrain_costs = np.array(terrain_costs, dtype=np.float32)
-                    # Robust objective: favor high average value and low
-                    # variation across terrain batches.
+                    terrain_returns = np.array(terrain_returns, dtype=np.float32)
+                    # Maximize mean(J_t) - lambda * std(J_t) for uniform terrain
+                    # performance; PSO minimizes, so negate the objective.
                     robustness_lambda = 0.5
-                    cost[i] = float(terrain_costs.mean() + robustness_lambda * terrain_costs.std())
+                    robust_objective = terrain_returns.mean() - robustness_lambda * terrain_returns.std()
+                    cost[i] = float(-robust_objective)
 
             return cost
 

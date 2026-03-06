@@ -66,14 +66,14 @@ class SnakeEnv(gymnasium.Env):
     design_parameter_bounds = [(0,3), (0,3), (0,3)]
 
     
-
+    """
     init_design_parameters = [
             [1, 1, 1, 1, 1, 1],
             [.5, .5, .5, .5, .5, .5],
             [.5, 1, .5, 1, .5, 1],
             [.75, .5, .75, .5, 1, 1]
             ] # NOTE: Change these depending on the design I am going to use
-    """
+    
     init_design_parameters = [
         [1.80] * 8,
         [.60] * 8,
@@ -182,9 +182,9 @@ class SnakeEnv(gymnasium.Env):
         wait_i = 0
         eps = 1e-3
         while abs(nextObs[0] - self._prev_obs[0]) < eps and abs(nextObs[1]) < eps and wait_i < max_wait:
-        max_wait = 50
-        wait_i = 0
-        eps = 1e-3
+            max_wait = 50
+            wait_i = 0
+            eps = 1e-3
         while abs(nextObs[0] - self._prev_obs[0]) < eps and abs(nextObs[1]) < eps and wait_i < max_wait:
             nextObs = self._get_obs()
             tmp_pos = copy.deepcopy(nextObs)

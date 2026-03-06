@@ -65,22 +65,24 @@ class SnakeEnv(gymnasium.Env):
     # Discrete bounds for [head, body, tail] scale type ids.
     design_parameter_bounds = [(0,3), (0,3), (0,3)]
 
-    # init_design_parameters = [
-    #         [1.0] * 6
-    #         [.5, .5, .5, .5, .5, .5]
-    #         [.5, 1, .5, 1, .5, 1]
-    #         [.75, .5, .75, .5, 1, 1]
-    #     ] # NOTE: Change these depending on the design I am going to use
+    
 
-    # init_design_parameters = [
-    #     [1.80] * 8,
-    #     [.60] * 8,
-    #     [2.70] * 8,
-    #     [1.80, .60, 2.70, 1.80, .60, 2.70, 1.80,.60,],
-    #     [2.653, 1.280, 2.385, 3.191, 1.485, 2.175, .542],
+    init_design_parameters = [
+            [1, 1, 1, 1, 1, 1],
+            [.5, .5, .5, .5, .5, .5],
+            [.5, 1, .5, 1, .5, 1],
+            [.75, .5, .75, .5, 1, 1]
+            ] # NOTE: Change these depending on the design I am going to use
+    """
+    init_design_parameters = [
+        [1.80] * 8,
+        [.60] * 8,
+        [2.70] * 8,
+        [1.80, .60, 2.70, 1.80, .60, 2.70, 1.80,.60,],
+        [2.653, 1.280, 2.385, 3.191, 1.485, 2.175, .542],
 
     # ] # NOTE: Change these depending on the design I am going to use
-
+    """
         # Initial symmetric and asymmetric scale-distribution seeds.
     init_design_parameters = [
         [0, 0, 0],  # symmetric: TPU spikes everywhere
@@ -105,6 +107,9 @@ class SnakeEnv(gymnasium.Env):
         self.motorMax = 2674 #2500 #2673
         
        
+        base_obs_dim = 11
+        design_dim = len(SnakeEnv.config_numpy)
+        obs_dim = base_obs_dim + design_dim
 
         base_obs_dim = 11
         design_dim = len(SnakeEnv.config_numpy)
@@ -177,10 +182,12 @@ class SnakeEnv(gymnasium.Env):
         wait_i = 0
         eps = 1e-3
         while abs(nextObs[0] - self._prev_obs[0]) < eps and abs(nextObs[1]) < eps and wait_i < max_wait:
+        max_wait = 50
+        wait_i = 0
+        eps = 1e-3
+        while abs(nextObs[0] - self._prev_obs[0]) < eps and abs(nextObs[1]) < eps and wait_i < max_wait:
             nextObs = self._get_obs()
-            print(nextObs)
             tmp_pos = copy.deepcopy(nextObs)
-            # nextObs[0] = nextObs[0] - self._prev_obs[0]
             nextObs[1] = nextObs[1] - self._prev_obs[1]
             nextObs[2] = nextObs[2] - self._prev_obs[2]
             print("im here")

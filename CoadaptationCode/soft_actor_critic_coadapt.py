@@ -3,7 +3,7 @@ This is from co adaptation framework: https://github.com/ksluck/Coadaptation/blo
 '''
 from rlkit.torch.sac.policies import TanhGaussianPolicy
 # from rlkit.torch.sac.sac import SoftActorCritic
-from rlkit.torch.networks import FlattenMlp
+from rlkit.torch.networks import ConcatMlp
 import numpy as np
 from rl_algorithm import RLAlgorithm
 # from rlkit.torch.sac.sac import SACTrainer
@@ -26,9 +26,9 @@ class SoftActorCriticCoadapt(RLAlgorithm):
                 which contain the networks.
 
         """
-        ptu.set_gpu_mode(True)
+        ptu.set_gpu_mode(False)
         super().__init__(env, replay, networks)
-        ptu.set_gpu_mode(True) 
+        ptu.set_gpu_mode(False) 
 
         # define networks for individual
         self._ind_qf1 = networks['individual']['qf1']
@@ -111,7 +111,7 @@ class SoftActorCriticCoadapt(RLAlgorithm):
         In this case basically creates a fresh instance of SAC for the
         individual networks and copies the values of the target network.
         """
-        ptu.set_gpu_mode(True)
+        ptu.set_gpu_mode(False)
         self._ind_algorithm = SACTrainer(
             env=self._env,
             policy=self._ind_policy,
@@ -152,7 +152,7 @@ class SoftActorCriticCoadapt(RLAlgorithm):
         """
             single step in the training
         """
-        ptu.set_gpu_mode(True)
+        ptu.set_gpu_mode(False)
         self.trainQ1losses = []
         self.trainQ2losses = []
         self.trainPolicylosses = []
@@ -208,7 +208,7 @@ class SoftActorCriticCoadapt(RLAlgorithm):
         Returns:
             A dictonary which contains the networks.
         """
-        ptu.set_gpu_mode(True)
+        ptu.set_gpu_mode(False)
         network_dict = {
             'individual' : SoftActorCriticCoadapt._create_networks(env=env),
             'population' : SoftActorCriticCoadapt._create_networks(env=env),    
@@ -237,25 +237,25 @@ class SoftActorCriticCoadapt(RLAlgorithm):
         hidden_sizes = [net_size] * 3
         # hidden_sizes = [net_size, net_size, net_size]
 
-        ptu.set_gpu_mode(True)
+        ptu.set_gpu_mode(False)
         device = torch.device('cuda:0')
         # could try different networks
-        qf1 = FlattenMlp(
+        qf1 = ConcatMlp(
             hidden_sizes=hidden_sizes,
             input_size=obs_dim + action_dim,
             output_size=1,
         ).to(device=ptu.device)
-        qf2 = FlattenMlp(
+        qf2 = ConcatMlp(
             hidden_sizes=hidden_sizes,
             input_size=obs_dim + action_dim,
             output_size=1,
         ).to(device=ptu.device)
-        qf1_target = FlattenMlp(
+        qf1_target = ConcatMlp(
             hidden_sizes=hidden_sizes,
             input_size=obs_dim + action_dim,
             output_size=1,
         ).to(device=ptu.device)
-        qf2_target = FlattenMlp(
+        qf2_target = ConcatMlp(
             hidden_sizes=hidden_sizes,
             input_size=obs_dim + action_dim,
             output_size=1,
@@ -266,6 +266,9 @@ class SoftActorCriticCoadapt(RLAlgorithm):
             obs_dim=obs_dim,
             action_dim=action_dim,
         ).to(device=ptu.device)
+
+        print("obs dim number", obs_dim)
+
 
         clip_value = 1.0
         for p in qf1.parameters():

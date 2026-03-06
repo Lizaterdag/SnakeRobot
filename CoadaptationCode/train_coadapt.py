@@ -98,7 +98,7 @@ class Train():
         name = "Losses_Design{}_carpet".format(str(self.design_counter))
         self.lossFilename = self.date+name
 
-        ptu.set_gpu_mode(True) # making sure to use GPU
+        ptu.set_gpu_mode(False) # making sure to use GPU
        
         #self.optimized_params = [3.5904986579519607, 1.7847799600014809, 3.584383159576394, 3.3680278532796404, 1.2309833188420878, 0.5229256834552103, 3.250148806721444]
         
@@ -121,6 +121,7 @@ class Train():
         else: # have reached end of training
             # can run end sequence here
             pass 
+
     
 
     def collect_training_experience(self):
@@ -173,7 +174,7 @@ class Train():
                 # exploration vs exploitation
                 #TODO:change to >
                 if self.currEp >= self.episodes_before_training : # can start training, exploitation
-                    action,_ = self.policy.get_action(state, deterministic=False) 
+                    action,_ = self.policy.get_action(state) 
                 else: # purely exploring
                     #action, _= self.pop_policy.get_action(state, deterministic=False)
                     action = np.random.uniform(-1,1, size=7) # this is for early designs
@@ -219,6 +220,8 @@ class Train():
 
             self.logData() # log data
             self.replay.terminate_episode() # run replay end sequence
+
+
 
 
     def initialize_episode(self):
@@ -640,12 +643,12 @@ if __name__ == '__main__':
     trainingObj.passLocks(optiLock, motorLock)
 
     # if resuming from a checkpoint:
-    base_path = "/home/liza/SnakeRobot/CoadaptationCode/results"
+    base_path = "/home/bazyli/Desktop/Snake Robot Project/Repo/SnakeRobot/CoadaptationCode/results_bazyli"
     #change name
     checkpoint_prefix = "2025_06_03_Design0_ep30"
 
     #set to false if new training starts
-    resuming_from_checkpoint = True  
+    resuming_from_checkpoint = False 
 
     if resuming_from_checkpoint:
         trainingObj.episode_counter = 30

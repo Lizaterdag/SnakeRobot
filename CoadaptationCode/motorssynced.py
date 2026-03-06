@@ -41,7 +41,7 @@ class MotorsSynced:
         # set motor variables
         self.BAUDRATE                       = 2000000 #57600 #2000000
         self.PROTOCOL_VERSION               = 2.0 # make sure motors are on this protocol version
-        self.DXL_ID                         = list(reversed([0,2,3,4,5,6]))
+        self.DXL_ID                         = list(reversed([1,2,3,4,5,6,7]))
         #[0,2,3,4,5,6]# IDs for motors, have these match to IDs set in dynamixel software
         self.ADDR_MX_TORQUE_ENABLE          = 64 # this ADDR value changes for different dynamixel models: https://emanual.robotis.com/docs/en/dxl/
         self.COMM_SUCCESS                   = 0 # variable for if message being sent to motors was successfully sent
@@ -57,7 +57,7 @@ class MotorsSynced:
         self.LEN_PRES_VELOC                 = 4
         self.LEN_PRES_LOAD                  = 2
 
-        self.DEVICENAME                     = '/dev/ttyUSB0' # this changes with every device, in linux: '/dev/ttyUSB0'
+        self.DEVICENAME                     = '/dev/ttyUSB1' # this changes with every device, in linux: '/dev/ttyUSB0'
         self.portHandler                    = PortHandler(self.DEVICENAME)
         self.packetHandler                  = PacketHandler(self.PROTOCOL_VERSION)
 
@@ -186,6 +186,44 @@ class MotorsSynced:
 
         return motorPos
     
+    def readVolt(self):
+        self.groupSyncRead.clearParam() # clear parameters from storage
+        for motorID in self.DXL_ID: 
+            addParamRes = self.groupSyncRead.addParam(motorID) # add parameters to be read
+            if addParamRes != True:
+                print("Motor %i groupSyncRead addparam failed" % motorID)
+               
+
+        motorPos = []
+
+
+        # read present pos
+        dxlCommRes = self.groupSyncRead.txRxPacket()
+        if dxlCommRes != self.COMM_SUCCESS:
+                print("%s" % self.packetHandler.getTxRxResult(dxlCommRes))
+
+        ADR = 144
+        LEN = 2
+        # ADR = self.ADDR_PRESENT_POSITION
+        # LEN = self.LEN_PRES_POS
+        # see if groupsync data available then get data
+        for motorID in self.DXL_ID:
+            getDataRes = self.groupSyncRead.isAvailable(motorID, ADR, LEN)
+            #print(getDataRes) 
+            if getDataRes != True:
+                print("Motor %i groupSyncRead getdata failed" % motorID)
+            else: # data is available
+                motorPos.append(self.groupSyncRead.getData(motorID, ADR, LEN))
+       
+
+        self.groupSyncRead.clearParam() # clear out data
+
+        # # normalize motor positions
+        # normalizedMotorPos = [2*(pos-self.MIN_POS)/(self.MAX_POS-self.MIN_POS)-1 for pos in motorPos]
+        # motorPos = normalizedMotorPos
+
+        return motorPos
+    
     def readVeloc(self, lock):
         # FUNCTION NOT CURRENTLY IN USE
 
@@ -277,11 +315,15 @@ if __name__ == '__main__':
     testMotors.setMotorSpeed()
     #print(testMotors.readPos())
     print(testMotors.readPos())
-    for i in range(10):
-        testMotors.writePos([1080,3050,1080,3050,1080,3050])
-        time.sleep(1)
-        testMotors.writePos([3050,1080,3050,1080,3050,1080])
-        time.sleep(1)
+    testMotors.writePos([2025,2025,2025,2025,2025,2025,2025])
+    time.sleep(5)
+    for i in range(100):
+        testMotors.writePos([1080,3050,1080,3050,1080,3050,1080])
+        time.sleep(.3)
+        # print(testMotors.readVolt())
+        # time.sleep(.2)
+        testMotors.writePos([3050,1080,3050,1080,3050,1080,3050])
+        time.sleep(.3)
     # testMotors.writePos([1026])
     # time.sleep(1)
     # testMotors.writePos([3078])

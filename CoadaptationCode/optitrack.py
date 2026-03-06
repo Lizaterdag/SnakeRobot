@@ -50,7 +50,7 @@ class ClientApp(object):
         if server_name == 'fake':
             client = natnet.fakes.SingleFrameFakeClient.fake_connect(rate=rate)
         else:
-            client = natnet.Client.connect("192.168.1.132")
+            client = natnet.Client.connect("10.0.10.2")
             print('client connected')
         if client is None:
             return None

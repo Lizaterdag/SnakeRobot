@@ -141,7 +141,8 @@ class Train():
             self.timesteps = []
 
             # reset environment
-            terrain = self.terrain_sequence[self.episode_counter % len(self.terrain_sequence)]
+            terrain_idx = self.episode_counter % len(self.terrain_sequence)
+            terrain = self.terrain_sequence[terrain_idx]
             SnakeEnv.set_current_terrain(terrain)
             print(f"CURRENT TERRAIN: {terrain}. Place robot on this terrain before continuing reset.")
             state, info = self.env.reset()
@@ -208,7 +209,7 @@ class Train():
 
                 print(f'action shape: {action.shape}')
                 self.replay.add_sample(observation=state, action=action, reward=reward, next_observation=next_state,
-                   terminal=terminal, env_info={})
+                   terminal=terminal, env_info={'terrain_id': terrain_idx})
 
                 state = next_state # set state for next iteration
 
@@ -551,6 +552,7 @@ class Train():
         rewardDF['Cumulative_Rewards'] = self.cumulativeRewards
         rewardDF['Terrain'] = [SnakeEnv.get_current_terrain()] * len(self.timesteps)
         design = SnakeEnv.get_current_design()
+        rewardDF['Terrain_ID'] = [self.episode_counter % len(self.terrain_sequence)] * len(self.timesteps)
         rewardDF['Scale_Head'] = [int(design[0])] * len(self.timesteps)
         rewardDF['Scale_Body'] = [int(design[1])] * len(self.timesteps)
         rewardDF['Scale_Tail'] = [int(design[2])] * len(self.timesteps)

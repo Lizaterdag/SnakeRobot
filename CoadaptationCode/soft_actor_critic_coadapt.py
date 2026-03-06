@@ -267,6 +267,9 @@ class SoftActorCriticCoadapt(RLAlgorithm):
             action_dim=action_dim,
         ).to(device=ptu.device)
 
+        print("obs dim number", obs_dim)
+
+
         clip_value = 1.0
         for p in qf1.parameters():
             p.register_hook(lambda grad: torch.clamp(grad, -clip_value, clip_value))

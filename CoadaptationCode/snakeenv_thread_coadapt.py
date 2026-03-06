@@ -48,28 +48,30 @@ class SnakeEnv(gymnasium.Env):
 
     # setting up design framework
     #TODO: make it 1.80 for 1 segment
-    current_design = [1.80] # put initial length in here, 6 links right now!
+    current_design = [1.0] * 6 # put initial length in here, 6 links right now!
 
     #design_parameter_bounds = [(.45, 3.60)] # the bounds of how small and large a variable can be 
 
     design_parameter_bounds = [(0,70),(2,7),(0,100),(0,1)] # angle of attack 0 to 70 deg, width attack 2mm to 7mm, infill 0% to 100%, material pla or tpu 
 
+    
+
     init_design_parameters = [
-            [1.0] * 6,
+            [1, 1, 1, 1, 1, 1],
             [.5, .5, .5, .5, .5, .5],
             [.5, 1, .5, 1, .5, 1],
             [.75, .5, .75, .5, 1, 1]
             ] # NOTE: Change these depending on the design I am going to use
+    """
+    init_design_parameters = [
+        [1.80] * 8,
+        [.60] * 8,
+        [2.70] * 8,
+        [1.80, .60, 2.70, 1.80, .60, 2.70, 1.80,.60,],
+        [2.653, 1.280, 2.385, 3.191, 1.485, 2.175, .542],
 
-    # init_design_parameters = [
-    #     [1.80] * 8,
-    #     [.60] * 8,
-    #     [2.70] * 8,
-    #     [1.80, .60, 2.70, 1.80, .60, 2.70, 1.80,.60,],
-    #     [2.653, 1.280, 2.385, 3.191, 1.485, 2.175, .542],
-
-    # ] # NOTE: Change these depending on the design I am going to use
-
+    ] # NOTE: Change these depending on the design I am going to use
+    """
     config_numpy = np.array(current_design)
     
     
@@ -83,8 +85,16 @@ class SnakeEnv(gymnasium.Env):
         self.motorMax = 2674 #2500 #2673
         
        
+        base_obs_dim = 11
+        design_dim = len(SnakeEnv.config_numpy)
+        obs_dim = base_obs_dim + design_dim
 
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(10+9,), dtype= 'float32') # data type is float32
+        self.observation_space = spaces.Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=(obs_dim,),   # must be tuple
+            dtype='float32'
+        )
         
         self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(7,), dtype='float32') # continuous action space
         #self.action_space = spaces.Box(low=self.motorMin, high=self.motorMax, shape=(18,), dtype='float32')
@@ -143,15 +153,16 @@ class SnakeEnv(gymnasium.Env):
         nextObs[1] = nextObs[1] - self._prev_obs[1]
         nextObs[2] = nextObs[2] - self._prev_obs[2]
 
-        while (nextObs[0]- self._prev_obs[0]) == 0. and nextObs[1] == 0.:
+        max_wait = 50
+        wait_i = 0
+        eps = 1e-3
+        while abs(nextObs[0] - self._prev_obs[0]) < eps and abs(nextObs[1]) < eps and wait_i < max_wait:
             nextObs = self._get_obs()
-            print(nextObs)
             tmp_pos = copy.deepcopy(nextObs)
-            # nextObs[0] = nextObs[0] - self._prev_obs[0]
             nextObs[1] = nextObs[1] - self._prev_obs[1]
             nextObs[2] = nextObs[2] - self._prev_obs[2]
-            print("im here")
-            print(nextObs[0], nextObs[1])
+            wait_i += 1
+
 
         self._prev_obs = tmp_pos
 
@@ -191,7 +202,7 @@ class SnakeEnv(gymnasium.Env):
         nextObs = np.append(nextObs, SnakeEnv.config_numpy)
         print(f"Observation: {nextObs}")
 
-        return np.array(nextObs), reward, terminated, truncated, info
+        return np.array(nextObs, dtype= np.float32), reward, terminated, truncated, info
     
     def reset(self, seed=None, options=None):
         # returns: observation of the initial state
@@ -251,7 +262,11 @@ class SnakeEnv(gymnasium.Env):
         observationfull = np.append(observation, SnakeEnv.config_numpy)
 
         print('full observation', observationfull)
-        return (np.array(observationfull), info)
+    
+        print("observation len",len(observation))
+        print("len numpy",len(SnakeEnv.config_numpy))
+        print("len numpy",len(SnakeEnv.config_numpy))
+        return (np.array(observationfull, dtype=np.float32), info)
 
     def render(self):
         # graphical window

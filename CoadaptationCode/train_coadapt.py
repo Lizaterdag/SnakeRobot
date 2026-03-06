@@ -75,7 +75,7 @@ class Train():
         It is possible to have different numbers of iterations for initial
         designs and the design optimization process.
         """
-        self.stateList = [[] for i in range(0,18)] #was 17
+        self.stateList = [] #was 17
         self.actionList = [[] for i in range(0,7)] #was 6
         self.designList = [[] for i in range(0,7)]
         self.timestepRewards = []
@@ -121,6 +121,7 @@ class Train():
         else: # have reached end of training
             # can run end sequence here
             pass 
+
     
 
     def collect_training_experience(self):
@@ -132,8 +133,9 @@ class Train():
             buffer.
 
             """
-
-            self.stateList = [[] for i in range(0,18)] #was 17
+            state, info = self.env.reset()
+            state_dim = len(state)
+            self.stateList = [[] for i in range(state_dim)] #was 17
             self.actionList = [[] for i in range(0,7)] # was 6
             self.timestepRewards = []
             self.cumulativeRewards = []
@@ -141,7 +143,10 @@ class Train():
             self.timesteps = []
 
             # reset environment
-            state, info = self.env.reset()
+
+
+            print("debug len(state):", len(state))
+            print("debug observation_space.shape:", self.env.observation_space.shape)
             steps = 0
             episodeRewards = 0
             episodeContRewards = []
@@ -190,7 +195,7 @@ class Train():
                 self.timestepRewards.append(reward)
                 self.cumulativeRewards.append(episodeRewards)
                 self.epList.append(self.currEp) # to make note of what episode we are on
-                for i in range(0,18): #was 17
+                for i in range(state_dim): #was 17
                     self.stateList[i].append(state[i])
 
 
@@ -214,6 +219,8 @@ class Train():
 
             self.logData() # log data
             self.replay.terminate_episode() # run replay end sequence
+
+
 
 
     def initialize_episode(self):

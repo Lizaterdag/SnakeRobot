@@ -39,6 +39,7 @@ class SnakeEnv(gymnasium.Env):
     starting_angle = None
 
     bla = time.time()
+    opti_last_print_time = 0.0
 
 
     '''
@@ -183,7 +184,6 @@ class SnakeEnv(gymnasium.Env):
             tmp_pos = copy.deepcopy(nextObs)
             nextObs[1] = nextObs[1] - self._prev_obs[1]
             nextObs[2] = nextObs[2] - self._prev_obs[2]
-            print("im here")
             wait_i += 1
 
         self._prev_obs = tmp_pos
@@ -232,7 +232,7 @@ class SnakeEnv(gymnasium.Env):
        
         
         super().reset(seed=seed)  # this is needed for cutom environments according to AI Gym
-
+        self.starting_angle = None
         input('Reset robot then press a button to continue') # used to pause to reset robot position
    
 
@@ -408,6 +408,11 @@ class SnakeEnv(gymnasium.Env):
             SnakeEnv.optiRelPos, heading = SnakeEnv.opti.optiTrackGetPos()
             if SnakeEnv.optiRelPos is not None and heading is not None and len(SnakeEnv.optiRelPos) >= 3 and len(heading) >= 3:
                 SnakeEnv.optiPosition = [*SnakeEnv.optiRelPos[:3], *heading[:3]]
+                now = time.time()
+                if now - SnakeEnv.opti_last_print_time >= 0.5:
+                    x, y, z = SnakeEnv.optiRelPos[:3]
+                    print(f"OptiTrack position (m): x={x:.4f}, y={y:.4f}, z={z:.4f}")
+                    SnakeEnv.opti_last_print_time = now
         except Exception as e:
             print(f"Opti thread warning: {e}")
         finally:

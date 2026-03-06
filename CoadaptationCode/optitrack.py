@@ -164,19 +164,16 @@ class Optitrack:
 
         self.app.run() # set up callback
 
-def optiTrackGetPos(self):
+    def optiTrackGetPos(self):
         try:
             self.app.run_callback()
             frame_data = getattr(self.app, 'optiData', None)
             if not frame_data:
-                raise RuntimeError(
-                    f"Rigid body id {self.target_rigid_body_id} not found in current NatNet frame. "
-                    "Ensure this rigid body is tracked and streamed from Motive."
-                )
+                return self.last_valid_coord, self.last_valid_angle
 
             sample = frame_data[0]
             if len(sample) < 9:
-                raise RuntimeError(f"Unexpected rigid body payload length: {len(sample)}")
+                return self.last_valid_coord, self.last_valid_angle
 
             coord = sample[2:5] # x y z
             normalizedOptiCoord = coord
@@ -190,9 +187,8 @@ def optiTrackGetPos(self):
             self.last_valid_coord = list(normalizedOptiCoord)
             self.last_valid_angle = list(normalizedOptiAngle)
             return normalizedOptiCoord, normalizedOptiAngle
-
-        except (natnet.DiscoveryError, RuntimeError, IndexError, ValueError) as e:
-            print('Error:', e)
+        
+        except (natnet.DiscoveryError, RuntimeError, IndexError, ValueError):
             return self.last_valid_coord, self.last_valid_angle
 
 

@@ -374,7 +374,7 @@ class SnakeEnv(gymnasium.Env):
         SnakeEnv.motors.writePos(posTo)
         SnakeEnv.motorLock.release()
 
-        time.sleep(.3) # sleep to allow motors to get to position
+        time.sleep(.1) # sleep to allow motors to get to position
 
 
     def getTorque(self):
@@ -411,7 +411,7 @@ class SnakeEnv(gymnasium.Env):
                 now = time.time()
                 if now - SnakeEnv.opti_last_print_time >= 0.5:
                     x, y, z = SnakeEnv.optiRelPos[:3]
-                    print(f"OptiTrack position (m): x={x:.4f}, y={y:.4f}, z={z:.4f}")
+                    #print(f"OptiTrack position (m): x={x:.4f}, y={y:.4f}, z={z:.4f}")
                     SnakeEnv.opti_last_print_time = now
         except Exception as e:
             print(f"Opti thread warning: {e}")

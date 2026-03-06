@@ -40,6 +40,7 @@ class ClientApp(object):
     # optiData = attr.ib([])
     velocData = []
     target_rigid_body_id = None
+    _last_target_missing_printed = 0
     
     @classmethod
     def connect(cls, server_name, rate, quiet, target_rigid_body_id=None):
@@ -92,6 +93,15 @@ class ClientApp(object):
                     if b.id_ == self.target_rigid_body_id:
                         selected_body = b
                         break
+                if selected_body is None:
+                    selected_body = rigid_bodies[0]
+                    now = time.time()
+                    if now - self._last_target_missing_printed > 2:
+                        print(
+                            f"Configured rigid body id {self.target_rigid_body_id} not present; "
+                            f"falling back to id {selected_body.id_}."
+                        )
+                        self._last_target_missing_printed = now
 
             if selected_body is not None:
                 self.optiData.append([time.time(), selected_body.id_, *(selected_body.position + selected_body.orientation)])
@@ -139,7 +149,7 @@ class Optitrack:
         parser.add_argument('--quiet', action='store_true')
         self.args = parser.parse_args()
 
-        target_rigid_body_id_env = os.getenv('OPTITRACK_RIGID_BODY_ID', '4')
+        target_rigid_body_id_env = os.getenv('OPTITRACK_RIGID_BODY_ID', "04")
         self.target_rigid_body_id = int(target_rigid_body_id_env) if target_rigid_body_id_env else None
 
         folder = 'mocap-data'

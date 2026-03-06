@@ -192,9 +192,7 @@ class Train():
         
                 next_state, reward, terminated, truncated, info = self.env.step(action) # step the action, note: reward is scaled in environment
 
-                if steps > self._episode_length:
-                    SnakeEnv.disableMotorTorque() # stop motors when reach end of an episode
-                    print('disabled torque')
+
                 
                 episodeRewards += reward # accumulate rewards here to track for comparison
         
@@ -208,7 +206,7 @@ class Train():
 
              
 
-                Done = terminated # can check here for terminated and truncated
+                Done = terminated or truncated or (steps >= self._episode_length)
                 terminal = np.array([Done]) # turn into array for replay buffer
                 reward = np.array([reward])
                 
@@ -219,6 +217,11 @@ class Train():
                    terminal=terminal, env_info={})
 
                 state = next_state # set state for next iteration
+
+            SnakeEnv.disableMotorTorque() # stop motors at the end of each episode
+            print('disabled torque')
+
+
                 
              
             self.episodeCumulativeRewards.append(episodeRewards)

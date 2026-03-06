@@ -99,7 +99,7 @@ class SnakeEnv(gymnasium.Env):
     config_numpy = np.array(current_design)
     
     
-    design_dims =  list(range(14-len(current_design), 15)) # either 14or 15
+    design_dims = list(range(11, 11 + len(current_design)))
     print('design dimensions!', design_dims)
     
     def __init__(self):
@@ -472,7 +472,11 @@ class SnakeEnv(gymnasium.Env):
       
     @staticmethod 
     def get_random_design():
-        optimized_params = np.random.uniform(low=SnakeEnv.design_parameter_bounds[0][0], high=SnakeEnv.design_parameter_bounds[0][1], size=7)
+        optimized_params = np.random.uniform(
+            low=SnakeEnv.design_parameter_bounds[0][0],
+            high=SnakeEnv.design_parameter_bounds[0][1],
+            size=len(SnakeEnv.design_parameter_bounds),
+        )
         return optimized_params
       
     @staticmethod

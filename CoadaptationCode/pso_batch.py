@@ -21,6 +21,7 @@ class PSO_batch(Design_Optimization):
         initial_state = initial_state['observations']
         design_dim = len(design)
         state_dim = initial_state.shape[1]
+        design_idx = SnakeEnv.get_design_dimensions()
         valid_design_idx = [int(i) for i in design_idx if 0 <= int(i) < state_dim]
         if len(valid_design_idx) != design_dim:
             valid_design_idx = list(range(state_dim - design_dim, state_dim))

@@ -45,17 +45,19 @@ class ClientApp(object):
     @classmethod
     def connect(cls, server_name, rate, quiet, target_rigid_body_id=None):
         # print('IN CONNECT')
-        print(cls)
-        print(server_name)
-        print(rate)
-        print(quiet)
         if server_name == 'fake':
             client = natnet.fakes.SingleFrameFakeClient.fake_connect(rate=rate)
         else:
-            client = natnet.Client.connect("10.0.10.2")
-            print('client connected')
+            server_ip = server_name or os.getenv('OPTITRACK_SERVER_IP', '10.0.10.2')
+            try:
+                client = natnet.Client.connect(server_ip)
+            except Exception as exc:
+                print(f"OptiTrack connection failed for '{server_ip}': {exc}")
+                client = None
+
         if client is None:
             return None
+        
         app = cls(client, quiet)
         app.target_rigid_body_id = target_rigid_body_id
         return app
@@ -147,10 +149,14 @@ class Optitrack:
         parser.add_argument('--rate', type=float, default=10,
                             help='Rate at which to produce fake data (Hz)')
         parser.add_argument('--quiet', action='store_true')
-        self.args = parser.parse_args()
+        self.args, _unknown = parser.parse_known_args()
 
-        target_rigid_body_id_env = os.getenv('OPTITRACK_RIGID_BODY_ID', "04")
-        self.target_rigid_body_id = int(target_rigid_body_id_env) if target_rigid_body_id_env else None
+        target_rigid_body_id_env = os.getenv('OPTITRACK_RIGID_BODY_ID', '4')
+        try:
+            self.target_rigid_body_id = int(target_rigid_body_id_env) if target_rigid_body_id_env else None
+        except ValueError:
+            print(f"Invalid OPTITRACK_RIGID_BODY_ID='{target_rigid_body_id_env}'. Using first visible rigid body.")
+            self.target_rigid_body_id = None
 
         folder = 'mocap-data'
         file_path = './' + folder + '/' + file_extension
@@ -172,10 +178,21 @@ class Optitrack:
             target_rigid_body_id=self.target_rigid_body_id,
         )
 
+        if self.app is None:
+            print(
+                "Warning: Unable to connect to OptiTrack NatNet server. Set --server or OPTITRACK_SERVER_IP, "
+                "or use --fake for offline testing. Position updates will use the last valid reading."
+            )
+            return
+
+
         self.app.run() # set up callback
 
     def optiTrackGetPos(self):
         try:
+            if self.app is None:
+                return self.last_valid_coord, self.last_valid_angle
+
             self.app.run_callback()
             frame_data = getattr(self.app, 'optiData', None)
             if not frame_data:
@@ -198,7 +215,7 @@ class Optitrack:
             self.last_valid_angle = list(normalizedOptiAngle)
             return normalizedOptiCoord, normalizedOptiAngle
         
-        except (natnet.DiscoveryError, RuntimeError, IndexError, ValueError):
+        except (natnet.DiscoveryError, RuntimeError, IndexError, ValueError, AttributeError):
             return self.last_valid_coord, self.last_valid_angle
 
 

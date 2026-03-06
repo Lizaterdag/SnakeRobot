@@ -40,7 +40,8 @@ class SnakeEnv(gymnasium.Env):
 
     bla = time.time()
     opti_last_print_time = 0.0
-
+    opti_last_update_time = 0.0
+    opti_last_stale_warn_time = 0.0
 
     '''
        Robot has 7 motors and 8 snake segments
@@ -329,6 +330,14 @@ class SnakeEnv(gymnasium.Env):
 
         if len(SnakeEnv.optiPosition) < 6:
             SnakeEnv.optiPosition = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        
+        # OptiTrack may stop publishing when stationary; keep the last valid
+        # pose instead of forcing zeros, but emit a throttled warning.
+        if SnakeEnv.opti_last_update_time > 0 and (time.time() - SnakeEnv.opti_last_update_time) > 1.0:
+            now = time.time()
+            if now - SnakeEnv.opti_last_stale_warn_time > 2.0:
+                print('OptiTrack stream stale (>1s). Reusing last valid pose (stationary robot likely).')
+                SnakeEnv.opti_last_stale_warn_time = now
 
 
         if initial == True:
@@ -409,6 +418,7 @@ class SnakeEnv(gymnasium.Env):
             if SnakeEnv.optiRelPos is not None and heading is not None and len(SnakeEnv.optiRelPos) >= 3 and len(heading) >= 3:
                 SnakeEnv.optiPosition = [*SnakeEnv.optiRelPos[:3], *heading[:3]]
                 now = time.time()
+                SnakeEnv.opti_last_update_time = now
                 if now - SnakeEnv.opti_last_print_time >= 0.5:
                     x, y, z = SnakeEnv.optiRelPos[:3]
                     #print(f"OptiTrack position (m): x={x:.4f}, y={y:.4f}, z={z:.4f}")

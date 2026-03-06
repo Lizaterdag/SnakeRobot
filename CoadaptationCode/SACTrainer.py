@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import inspect
 
 import numpy as np
 import torch
@@ -88,6 +89,79 @@ class SACTrainer(TorchTrainer):
         self.eval_statistics = OrderedDict()
         self._n_train_steps_total = 0
         self._need_to_update_eval_statistics = True
+        self._policy_forward_signature = inspect.signature(self.policy.forward)
+
+    def _policy_forward(self, obs):
+        policy_kwargs = {}
+        if 'reparameterize' in self._policy_forward_signature.parameters:
+            policy_kwargs['reparameterize'] = True
+        elif 'reparametrize' in self._policy_forward_signature.parameters:
+            # Compatibility with policies that use the misspelled keyword.
+            policy_kwargs['reparametrize'] = True
+        if 'return_log_prob' in self._policy_forward_signature.parameters:
+            policy_kwargs['return_log_prob'] = True
+        policy_output = self.policy(obs, **policy_kwargs)
+
+        if isinstance(policy_output, (tuple, list)):
+            return policy_output
+
+        # Some rlkit variants return a distribution object (e.g. TanhNormal)
+        # instead of an unpackable tuple. In that case, sample an action and
+        # derive log-prob / summary stats manually.
+        dist = policy_output
+        pre_tanh_value = None
+
+        if hasattr(dist, 'rsample'):
+            try:
+                actions, pre_tanh_value = dist.rsample(return_pretanh_value=True)
+            except TypeError:
+                actions = dist.rsample()
+        elif hasattr(dist, 'sample'):
+            try:
+                actions, pre_tanh_value = dist.sample(return_pretanh_value=True)
+            except TypeError:
+                actions = dist.sample()
+        else:
+            raise TypeError(f"Unsupported policy output type: {type(dist)}")
+
+        log_pi = None
+        if hasattr(dist, 'log_prob'):
+            try:
+                if pre_tanh_value is not None:
+                    log_pi = dist.log_prob(actions, pre_tanh_value=pre_tanh_value)
+                else:
+                    log_pi = dist.log_prob(actions)
+            except TypeError:
+                log_pi = dist.log_prob(actions)
+
+            if log_pi.dim() == 1:
+                log_pi = log_pi.unsqueeze(-1)
+            elif log_pi.dim() > 1 and log_pi.shape[-1] != 1:
+                log_pi = log_pi.sum(dim=-1, keepdim=True)
+
+        if log_pi is None:
+            log_pi = torch.zeros_like(actions[..., :1])
+
+        policy_mean = getattr(dist, 'normal_mean', None)
+        if policy_mean is None:
+            policy_mean = getattr(dist, 'mean', None)
+        if policy_mean is None:
+            policy_mean = actions
+
+        policy_log_std = getattr(dist, 'normal_log_std', None)
+        if policy_log_std is None:
+            policy_log_std = getattr(dist, 'log_std', None)
+        if policy_log_std is None:
+            std = getattr(dist, 'normal_std', None)
+            if std is None:
+                std = getattr(dist, 'std', None)
+            if std is not None and torch.is_tensor(std):
+                policy_log_std = torch.log(std.clamp(min=1e-6))
+            else:
+                policy_log_std = torch.zeros_like(actions)
+
+        return actions, policy_mean, policy_log_std, log_pi
+
 
     def train_from_torch(self, batch):
         rewards = batch['rewards']
@@ -99,9 +173,8 @@ class SACTrainer(TorchTrainer):
         """
         Policy and Alpha Loss
         """
-        new_obs_actions, policy_mean, policy_log_std, log_pi, *_ = self.policy(
-            obs, reparameterize=True, return_log_prob=True,
-        )
+
+        new_obs_actions, policy_mean, policy_log_std, log_pi, *_ = self._policy_forward(obs)
         if self.use_automatic_entropy_tuning:
             alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
             self.alpha_optimizer.zero_grad()
@@ -124,9 +197,7 @@ class SACTrainer(TorchTrainer):
         q1_pred = self.qf1(obs, actions)
         q2_pred = self.qf2(obs, actions)
         # Make sure policy accounts for squashing functions like tanh correctly!
-        new_next_actions, _, _, new_log_pi, *_ = self.policy(
-            next_obs, reparameterize=True, return_log_prob=True,
-        )
+        new_next_actions, _, _, new_log_pi, *_ = self._policy_forward(next_obs)
         target_q_values = torch.min(
             self.target_qf1(next_obs, new_next_actions),
             self.target_qf2(next_obs, new_next_actions),

@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import time
 import pandas as pd
 from scipy.interpolate import interp1d
+from scipy.spatial.transform import Rotation
 import os
 import copy
 from datetime import datetime
@@ -25,7 +26,7 @@ global optiPos, motorPos
 
 class SnakeEnv(gymnasium.Env):
     # static variables so can be accessed between static and non static methods
-    optiPosition = []
+    optiPosition = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     motorPosition = []
     optiXTrack = []
     optiYTrack = []
@@ -110,10 +111,6 @@ class SnakeEnv(gymnasium.Env):
         base_obs_dim = 11
         design_dim = len(SnakeEnv.config_numpy)
         obs_dim = base_obs_dim + design_dim
-
-        base_obs_dim = 11
-        design_dim = len(SnakeEnv.config_numpy)
-        obs_dim = base_obs_dim + design_dim
         self.observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
@@ -182,16 +179,11 @@ class SnakeEnv(gymnasium.Env):
         wait_i = 0
         eps = 1e-3
         while abs(nextObs[0] - self._prev_obs[0]) < eps and abs(nextObs[1]) < eps and wait_i < max_wait:
-            max_wait = 50
-            wait_i = 0
-            eps = 1e-3
-        while abs(nextObs[0] - self._prev_obs[0]) < eps and abs(nextObs[1]) < eps and wait_i < max_wait:
             nextObs = self._get_obs()
             tmp_pos = copy.deepcopy(nextObs)
             nextObs[1] = nextObs[1] - self._prev_obs[1]
             nextObs[2] = nextObs[2] - self._prev_obs[2]
             print("im here")
-            print(nextObs[0], nextObs[1])
             wait_i += 1
 
         self._prev_obs = tmp_pos
@@ -325,6 +317,20 @@ class SnakeEnv(gymnasium.Env):
         SnakeEnv.motorLock.acquire()
         SnakeEnv.optiLock.acquire()
 
+
+        wait_count = 0
+        while len(SnakeEnv.optiPosition) < 6 and wait_count < 1000:
+            SnakeEnv.optiLock.release()
+            SnakeEnv.motorLock.release()
+            time.sleep(.001)
+            SnakeEnv.motorLock.acquire()
+            SnakeEnv.optiLock.acquire()
+            wait_count += 1
+
+        if len(SnakeEnv.optiPosition) < 6:
+            SnakeEnv.optiPosition = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+
         if initial == True:
             SnakeEnv.prevPos = SnakeEnv.optiPosition[0:3]
 
@@ -398,14 +404,19 @@ class SnakeEnv(gymnasium.Env):
     @staticmethod
     def optiPos():
         SnakeEnv.optiLock.acquire()
-        SnakeEnv.optiRelPos, heading = SnakeEnv.opti.optiTrackGetPos()
-        #print(time.time() - SnakeEnv.bla)
-        SnakeEnv.optiPosition = [*SnakeEnv.optiRelPos, *heading]
-        #print(SnakeEnv.optiPosition)
-        SnakeEnv.optiLock.release()
+        try:
+            SnakeEnv.optiRelPos, heading = SnakeEnv.opti.optiTrackGetPos()
+            if SnakeEnv.optiRelPos is not None and heading is not None and len(SnakeEnv.optiRelPos) >= 3 and len(heading) >= 3:
+                SnakeEnv.optiPosition = [*SnakeEnv.optiRelPos[:3], *heading[:3]]
+        except Exception as e:
+            print(f"Opti thread warning: {e}")
+        finally:
+            SnakeEnv.optiLock.release()
         time.sleep(.001) # changed from .008
         #SnakeEnv.bla = time.time()
         return
+    
+
     
     @staticmethod
     def motorPos():

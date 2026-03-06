@@ -29,7 +29,7 @@ class Train():
     
         self._reward_scale = 1.0
         self.optimized_params = None
-        self._episode_length = 175 # number of timesteps per episode
+        self._episode_length = 50 # number of timesteps per episode
         self.episode_counter = None
         self.episodes_before_training = 0 #4 # number of episodes before training to fill the replay buffer
         self.episode_iterations = 30 # number of episodes per design
@@ -65,6 +65,11 @@ class Train():
         self.date = datetime.now().strftime("%Y_%m_%d") # for files
         self.terrain_sequence = ['floor', 'carpet', 'cardboard', 'artificial_grass']
         
+    def _action_dim(self):
+        action_shape = getattr(self.env.action_space, "shape", None)
+        if action_shape and len(action_shape) > 0:
+            return action_shape[0]
+        return 7
 
     def run(self, stopEvent):
         """ Runs the Fast Evolution through Actor-Critic RL algorithm.
@@ -76,7 +81,7 @@ class Train():
         designs and the design optimization process.
         """
         self.stateList = []
-        self.actionList = [[] for i in range(0,7)] #was 6
+        self.actionList = [[] for _ in range(self._action_dim())] #was 6
         self.designList = [[] for i in range(0,7)]
         self.timestepRewards = []
         self.episodeCumulativeRewards = []
@@ -135,7 +140,7 @@ class Train():
             """
 
             self.stateList = []
-            self.actionList = [[] for i in range(0,7)] # was 6
+            self.actionList = [[] for _ in range(self._action_dim())] # was 6
             self.timestepRewards = []
             self.cumulativeRewards = []
             self.epList = []
@@ -180,7 +185,8 @@ class Train():
                     action = np.random.uniform(-1,1, size=7) # this is for early designs
 
 
-                for i in range(0,6): # for data logging purpose
+                num_logged_actions = min(len(self.actionList), len(action))
+                for i in range(num_logged_actions):
                     self.actionList[i].append(action[i])
                 
         
@@ -392,19 +398,23 @@ class Train():
         """ Saves the networks on the disk.
         """
          # TODO: Edit this to store more efficiently
-       
-        torch.save(self.rl_alg._ind_policy, 'results/ind_policy_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter))
-        torch.save(self.rl_alg._ind_qf1, 'results/ind_qf1_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter))
-        torch.save(self.rl_alg._ind_qf2, 'results/ind_qf2_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter))
-        torch.save(self.rl_alg._ind_qf1_target, 'results/ind_qf1_tar_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter))
-        torch.save(self.rl_alg._ind_qf2_target, 'results/ind_qf2_tar_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter))
+
+        results_dir = 'results_bazyli'
+        os.makedirs(results_dir, exist_ok=True)
+
+        torch.save(self.rl_alg._ind_policy, os.path.join(results_dir, 'ind_policy_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter)))
+        torch.save(self.rl_alg._ind_qf1, os.path.join(results_dir, 'ind_qf1_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter)))
+        torch.save(self.rl_alg._ind_qf2, os.path.join(results_dir, 'ind_qf2_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter)))
+        torch.save(self.rl_alg._ind_qf1_target, os.path.join(results_dir, 'ind_qf1_tar_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter)))
+        torch.save(self.rl_alg._ind_qf2_target, os.path.join(results_dir, 'ind_qf2_tar_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter)))
 
 
-        torch.save(self.rl_alg._pop_policy, 'results/pop_policy_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter))
-        torch.save(self.rl_alg._pop_qf1, 'results/pop_qf1_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter))
-        torch.save(self.rl_alg._pop_qf2, 'results/pop_qf2_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter))
-        torch.save(self.rl_alg._pop_qf1_target, 'results/pop_qf1_tar_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter))
-        torch.save(self.rl_alg._pop_qf2_target, 'results/pop_qf2_tar_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter))
+        torch.save(self.rl_alg._pop_policy, os.path.join(results_dir, 'pop_policy_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter)))
+        torch.save(self.rl_alg._pop_qf1, os.path.join(results_dir, 'pop_qf1_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter)))
+        torch.save(self.rl_alg._pop_qf2, os.path.join(results_dir, 'pop_qf2_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter)))
+        torch.save(self.rl_alg._pop_qf1_target, os.path.join(results_dir, 'pop_qf1_tar_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter)))
+        torch.save(self.rl_alg._pop_qf2_target, os.path.join(results_dir, 'pop_qf2_tar_{}_Design{}_ep{}_carpet.pt'.format(self.date, self.design_counter, self.episode_counter)))
+
         
         metadata = {
             'design_counter': self.design_counter,
@@ -412,10 +422,10 @@ class Train():
             'optimized_params': getattr(self, 'optimized_params', None) 
         }
 
-        with open(f'results/{self.date}_Design{self.design_counter}_ep{self.episode_counter}_metadata_carpet.json', 'w') as f:
+        with open(os.path.join(results_dir, f'{self.date}_Design{self.design_counter}_ep{self.episode_counter}_metadata_carpet.json'), 'w') as f:
             json.dump(metadata, f)
 
-        self.save_replay(f'results/replay_{self.date}_Design{self.design_counter}_carpet.pt')
+        self.save_replay(os.path.join(results_dir, f'replay_{self.date}_Design{self.design_counter}_carpet.pt'))
 
         print(f"saved networks for design {self.design_counter} and episode {self.episode_counter}")    
 
@@ -516,7 +526,7 @@ class Train():
 
 
     def logData(self):
-
+        os.makedirs(os.path.dirname(self.filename) or '.', exist_ok=True)
         xPositionList, yPositionList = SnakeEnv.returnOptiXList()
         min_len = min(len(self.timesteps), len(xPositionList))
 
@@ -528,13 +538,13 @@ class Train():
         yPositionList = yPositionList[:min_len]
         self.epList = self.epList[:min_len]
 
-        for i in range(7): #was 6
+        for i in range(len(self.actionList)): #was 6
             self.actionList[i] = self.actionList[i][:min_len]
         for i in range(len(self.stateList)):
             self.stateList[i] = self.stateList[i][:min_len]
         rewardDF = pd.DataFrame()
 
-        rewardDF['Episode'] = [self.episode_counter]*176
+        rewardDF['Episode'] = [self.episode_counter]* len(self.timesteps)
         rewardDF['Timestep'] = self.timesteps
         rewardDF['X_Position']= xPositionList # added this, need to see if it works
         rewardDF['Y_Position']= yPositionList # added this, need to see if it works
@@ -547,12 +557,8 @@ class Train():
         rewardDF['Scale_Tail'] = [int(design[2])] * len(self.timesteps)
 
         # log state variablesmotor_and_coadaptation/CoadaptationCode/train_coadapt.py
-        rewardDF['Motor1_Action'] = self.actionList[0]
-        rewardDF['Motor2_Action'] = self.actionList[1]
-        rewardDF['Motor3_Action'] = self.actionList[2]
-        rewardDF['Motor4_Action'] = self.actionList[3]
-        rewardDF['Motor5_Action'] = self.actionList[4]
-        rewardDF['Motor6_Action'] = self.actionList[5]
+        for motor_idx, motor_actions in enumerate(self.actionList):
+            rewardDF[f'Motor{motor_idx + 1}_Action'] = motor_actions
       
 
         # log state variables
@@ -591,6 +597,7 @@ class Train():
             rewardDF.to_csv(self.filename, index=False)
 
     def logTrainLoss(self):
+        os.makedirs(os.path.dirname(self.lossFilename) or '.', exist_ok=True)
         lossDF = pd.DataFrame()
         lossDF['Episode'] = self.epListLoss
         lossDF['Ind_Q1_Loss'] = self.q1loss

@@ -39,9 +39,10 @@ class ClientApp(object):
 
     # optiData = attr.ib([])
     velocData = []
+    target_rigid_body_id = None
     
     @classmethod
-    def connect(cls, server_name, rate, quiet):
+    def connect(cls, server_name, rate, quiet, target_rigid_body_id=None):
         # print('IN CONNECT')
         print(cls)
         print(server_name)
@@ -54,7 +55,9 @@ class ClientApp(object):
             print('client connected')
         if client is None:
             return None
-        return cls(client, quiet)
+        app = cls(client, quiet)
+        app.target_rigid_body_id = target_rigid_body_id
+        return app
 
     def run(self):
 
@@ -77,24 +80,22 @@ class ClientApp(object):
         # print('IN CALLBACK')
         #print()
         #print('{:.1f}s: Received mocap frame'.format(timing.timestamp))
-        self.optiData = [] # ADDED THIS, use array in case mutliple rigid bodies
+        self.optiData = [] # stores only the selected rigid body sample
 
         if rigid_bodies:
-            #print('Rigid bodies:')
-            for b in rigid_bodies:
-                
-                # print('\t Id {}: ({: 5.2f}, {: 5.2f}, {: 5.2f}), ({: 5.2f}, {: 5.2f}, {: 5.2f}, {: 5.2f})'.format(
-                #     b.id_, *(b.position + b.orientation)
-                # ))
-                
-                # file_path = './' + 'mocap-data' + '/' + file_extension
+            selected_body = None
 
-                # with open(os.path.join(file_path,
-                #         'data.csv'), 'a') as fd:
-                #     cwriter = csv.writer(fd)
-                #     cwriter.writerow([time.time(), b.id_, *(b.position + b.orientation)]) # time.time() is time since 'epoch' - Jan 1 1970 00:00:00
-                self.optiData.append([time.time(), b.id_, *(b.position + b.orientation)])
-                # print('Current Data ', self.optiData)
+            if self.target_rigid_body_id is None:
+                selected_body = rigid_bodies[0]
+            else:
+                for b in rigid_bodies:
+                    if b.id_ == self.target_rigid_body_id:
+                        selected_body = b
+                        break
+
+            if selected_body is not None:
+                self.optiData.append([time.time(), selected_body.id_, *(selected_body.position + selected_body.orientation)])
+
                        
         
         '''''
@@ -125,6 +126,9 @@ class Optitrack:
         self.optiCoordMin = 0
         self.optiAngRange = 360
         self.optiAngMin = -180 # converted to euler so -180 to 180
+        self.last_valid_coord = [0.0, 0.0, 0.0]
+        self.last_valid_angle = [0.0, 0.0, 0.0]
+
     
         parser = argparse.ArgumentParser()
         parser.add_argument('--server', help='Will autodiscover if not supplied')
@@ -135,6 +139,8 @@ class Optitrack:
         parser.add_argument('--quiet', action='store_true')
         self.args = parser.parse_args()
 
+        target_rigid_body_id_env = os.getenv('OPTITRACK_RIGID_BODY_ID', '4')
+        self.target_rigid_body_id = int(target_rigid_body_id_env) if target_rigid_body_id_env else None
 
         folder = 'mocap-data'
         file_path = './' + folder + '/' + file_extension
@@ -149,36 +155,45 @@ class Optitrack:
         #     cwriter = csv.writer(fd)
         #     cwriter.writerow(['Timestamp', 'ID', 'Pos x', 'Pos y', 'Pos z', 'Quat w', 'Quat x', 'Quat y', 'Quat z']) # time.time() is time since 'epoch' - Jan 1 1970 00:00
 
+        self.app = ClientApp.connect(
+            'fake' if self.args.fake else self.args.server,
+            self.args.rate,
+            self.args.quiet,
+            target_rigid_body_id=self.target_rigid_body_id,
+        )
 
-        self.app = ClientApp.connect('fake' if self.args.fake else self.args.server, self.args.rate, self.args.quiet)
         self.app.run() # set up callback
 
-    def optiTrackGetPos(self):
+def optiTrackGetPos(self):
         try:
             self.app.run_callback()
-            # extract elements of data 
-            coord = self.app.optiData[0][2:5] # x y z
-            #normalizedOptiCoord = [2*(pos-self.optiCoordMin)/self.optiCoordRange-1 for pos in coord]
+            frame_data = getattr(self.app, 'optiData', None)
+            if not frame_data:
+                raise RuntimeError(
+                    f"Rigid body id {self.target_rigid_body_id} not found in current NatNet frame. "
+                    "Ensure this rigid body is tracked and streamed from Motive."
+                )
+
+            sample = frame_data[0]
+            if len(sample) < 9:
+                raise RuntimeError(f"Unexpected rigid body payload length: {len(sample)}")
+
+            coord = sample[2:5] # x y z
             normalizedOptiCoord = coord
-            # print('COORD',coord)
-            
-            quaternion = self.app.optiData[0][5:] # quat w, quat x, quat y, quat z
-            # print('QUAT', quaternion)
-            quaternion.append(quaternion.pop(0)) # put into quat x, quat y, quat z, quat w form
-            
-            # convert quaternion
+
+            quaternion = sample[5:] # quat w, quat x, quat y, quat z
+            quaternion = quaternion[1:] + quaternion[:1] # put into quat x, quat y, quat z, quat w form
+
             rotation = Rotation.from_quat(quaternion) # x y z w
-            # eulerRot = rotation.as_euler('xyz', degrees=True) # returning in degrees
-            # normalizedOptiAngle = [2*(pos-self.optiAngMin)/self.optiAngRange-1 for pos in eulerRot]
             normalizedOptiAngle = rotation.as_euler('xzy', degrees=True)
-            
-            #result = [*coord, *eulerRot]
-            result = [*normalizedOptiCoord, *normalizedOptiAngle] # return normalized data
-         
-            return normalizedOptiCoord, normalizedOptiAngle #eulerRot
-            
-        except natnet.DiscoveryError as e:
+
+            self.last_valid_coord = list(normalizedOptiCoord)
+            self.last_valid_angle = list(normalizedOptiAngle)
+            return normalizedOptiCoord, normalizedOptiAngle
+
+        except (natnet.DiscoveryError, RuntimeError, IndexError, ValueError) as e:
             print('Error:', e)
+            return self.last_valid_coord, self.last_valid_angle
 
 
 

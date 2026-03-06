@@ -19,7 +19,6 @@ class PSO_batch(Design_Optimization):
 
         initial_state = self._replay.random_batch(self._state_batch_size)
         initial_state = initial_state['observations']
-        design_idx = SnakeEnv.get_design_dimensions()
         design_dim = len(design)
         state_dim = initial_state.shape[1]
         valid_design_idx = [int(i) for i in design_idx if 0 <= int(i) < state_dim]
@@ -62,7 +61,7 @@ class PSO_batch(Design_Optimization):
             with torch.no_grad():
                 for i in range(shape[0]):
                     x_discrete = _discretize_design(x_input[i])
-                    terrain_costs = []
+                    terrain_returns = []
                     for terrain_state_batch in terrain_state_batches:
                         state_batch = _inject_design(terrain_state_batch, x_discrete)
 

@@ -64,6 +64,8 @@ class Train():
 
         self.date = datetime.now().strftime("%Y_%m_%d") # for files
         self.terrain_sequence = ['floor', 'carpet', 'cardboard', 'artificial_grass']
+        self.eval_episodes_per_terrain = 3
+        self.eval_robustness_lambda = 0.5
         
     def _action_dim(self):
         action_shape = getattr(self.env.action_space, "shape", None)
@@ -300,6 +302,9 @@ class Train():
         
             #self.plot_rewards()
 
+        # Evaluate current design before running design optimization
+        self.evaluate_policy()
+
         # Design Optimization
         print(f'design counter at {self.design_counter}')
         if self.design_counter >= self.num_init_designs:
@@ -348,8 +353,6 @@ class Train():
         self.episode_counter += 1
 
         print(f'episode counter at: {self.episode_counter}')
-        # evaluate policy
-        self.evaluate_policy()
 
         self.save_networks()
       
@@ -379,20 +382,99 @@ class Train():
             self.train_single_iteration()
 
             print(f'range {range(self.episode_counter, self.episode_iterations)}')
+        
+        self.evaluate_policy()
         self.design_counter += 1
         self.episode_counter = 0
+
         
         return
           
     def evaluate_policy(self):
-        """ Evaluates the current deterministic policy.
-
-        Evaluates the current policy in the environment by unrolling a single
-        episode in the environment.
-        The achieved cumulative reward is logged.
+        """Evaluate deterministic policy performance across all terrains.
+        Runs multiple deterministic rollouts per terrain and stores a
+        per-design summary for robust cross-terrain comparison.
         """
         # can add a policy rollout here
-        pass
+        policy = self.rl_alg.get_policy_network(self.networks['individual'])
+
+        terrain_returns = {}
+        for terrain_idx, terrain in enumerate(self.terrain_sequence):
+            SnakeEnv.set_current_terrain(terrain)
+            episode_returns = []
+
+            for _ in range(self.eval_episodes_per_terrain):
+                state, _ = self.env.reset()
+                done = False
+                steps = 0
+                cumulative_reward = 0.0
+
+                while (not done) and steps < self._episode_length:
+                    try:
+                        action, _ = policy.get_action(state, deterministic=True)
+                    except TypeError:
+                        action, _ = policy.get_action(state)
+
+                    next_state, reward, terminated, truncated, _ = self.env.step(action)
+                    cumulative_reward += float(reward)
+                    steps += 1
+                    done = terminated or truncated or (steps >= self._episode_length)
+                    state = next_state
+
+                SnakeEnv.disableMotorTorque()
+                episode_returns.append(cumulative_reward)
+
+            terrain_returns[terrain] = episode_returns
+
+        terrain_means = {terrain: float(np.mean(vals)) for terrain, vals in terrain_returns.items()}
+        terrain_std = {terrain: float(np.std(vals)) for terrain, vals in terrain_returns.items()}
+
+        mean_return_per_terrain = np.array(list(terrain_means.values()), dtype=np.float32)
+        overall_mean = float(np.mean(mean_return_per_terrain))
+        worst_terrain_return = float(np.min(mean_return_per_terrain))
+        std_across_terrains = float(np.std(mean_return_per_terrain))
+        robustness_score = float(overall_mean - self.eval_robustness_lambda * std_across_terrains)
+
+        summary_row = {
+            'Date': self.date,
+            'Design_Counter': int(self.design_counter),
+            'Episode_Counter': int(self.episode_counter),
+            'Scale_Head': int(SnakeEnv.get_current_design()[0]),
+            'Scale_Body': int(SnakeEnv.get_current_design()[1]),
+            'Scale_Tail': int(SnakeEnv.get_current_design()[2]),
+            'Eval_Episodes_Per_Terrain': int(self.eval_episodes_per_terrain),
+            'Overall_Mean_Return': overall_mean,
+            'Worst_Terrain_Return': worst_terrain_return,
+            'Std_Across_Terrain_Means': std_across_terrains,
+            'Robustness_Score': robustness_score,
+        }
+
+        for terrain in self.terrain_sequence:
+            summary_row[f'{terrain}_Mean_Return'] = terrain_means[terrain]
+            summary_row[f'{terrain}_Std_Return'] = terrain_std[terrain]
+
+        results_dir = 'results_bazyli'
+        os.makedirs(results_dir, exist_ok=True)
+
+        summary_csv_path = os.path.join(results_dir, f'{self.date}_design_eval_summary.csv')
+        summary_df = pd.DataFrame([summary_row])
+        if os.path.isfile(summary_csv_path):
+            summary_df.to_csv(summary_csv_path, mode='a', header=False, index=False)
+        else:
+            summary_df.to_csv(summary_csv_path, index=False)
+
+        detail_payload = {
+            'summary': summary_row,
+            'terrain_episode_returns': terrain_returns,
+        }
+        detail_json_path = os.path.join(
+            results_dir,
+            f'{self.date}_Design{self.design_counter}_ep{self.episode_counter}_eval_summary.json'
+        )
+        with open(detail_json_path, 'w') as f:
+            json.dump(detail_payload, f, indent=2)
+
+        print('Evaluation summary:', summary_row)
        
     def save_networks(self):
         """ Saves the networks on the disk.

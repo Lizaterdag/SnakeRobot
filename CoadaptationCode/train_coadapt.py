@@ -71,15 +71,7 @@ class Train():
             return action_shape[0]
         return 7
 
-    def run(self, stopEvent):
-        """ Runs the Fast Evolution through Actor-Critic RL algorithm.
-
-        First the initial design loop is executed in which the rl-algorithm
-        is exeuted on the initial designs. Then the design-optimization
-        process starts.
-        It is possible to have different numbers of iterations for initial
-        designs and the design optimization process.
-        """
+    def _initialize_run_logs(self):
         self.stateList = []
         self.actionList = [[] for _ in range(self._action_dim())] #was 6
         self.designList = [[] for i in range(0,7)]
@@ -96,36 +88,38 @@ class Train():
         self.popq2loss = []
         self.poppolicyloss = []
 
-        # setting up files and file names
+    def _set_output_filenames(self):
         self.date = datetime.now().strftime("%Y_%m_%d")
         name = "Rewards_Design{}_carpet".format(str(self.design_counter))
         self.filename = self.date+name
         name = "Losses_Design{}_carpet".format(str(self.design_counter))
         self.lossFilename = self.date+name
 
-        ptu.set_gpu_mode(False) # making sure to use GPU
-       
-        #self.optimized_params = [3.5904986579519607, 1.7847799600014809, 3.584383159576394, 3.3680278532796404, 1.2309833188420878, 0.5229256834552103, 3.250148806721444]
-        
-        # determine what to do based on design cycle currently on
-        if self.design_counter < self.num_init_designs: # if not done with initial design loop
-            self.initial_design_loop() # run another initial design loop
-            print(f'design counter at {self.design_counter}')
-            if self.design_counter == self.num_init_designs: # if on last initial design cycle
-                # last initial design
-                self.first_train_op() # run design
-            stopEvent.set() # end thread
-            return
-        
-        
-        elif self.design_counter < self.design_cylces: # if still on all other designs
-            self.train_loop()
-            stopEvent.set() # end thread
-            return
+    def run(self, stopEvent, max_design_cycles_per_run=1):
+        """ Runs Fast Evolution through Actor-Critic RL algorithm.
+        Chunked execution: process up to max_design_cycles_per_run design cycles
+        in one invocation, then return so hardware and metrics can be checked.
+        """
+        self._initialize_run_logs()
+        ptu.set_gpu_mode(False)
 
-        else: # have reached end of training
-            # can run end sequence here
-            pass 
+        completed_cycles = 0
+        while self.design_counter < self.design_cylces and completed_cycles < max_design_cycles_per_run:
+            self._set_output_filenames()
+
+            if self.design_counter < self.num_init_designs:
+                self.initial_design_loop()
+                print(f'design counter at {self.design_counter}')
+                if self.design_counter == self.num_init_designs and self.optimized_params is None:
+                    self.first_train_op()
+            else:
+                self.train_loop()
+
+            completed_cycles += 1
+
+        stopEvent.set()
+        return
+
 
     
 
@@ -313,7 +307,6 @@ class Train():
             policy_network = self.rl_alg.get_policy_network(self.networks['population'])
             self.cost, self.optimized_params = self.do_alg.optimize_design(design=self.optimized_params, q_network=q_network, policy_network=policy_network)
             self.optimized_params = list(self.optimized_params)
-            self.design_counter += 1 # another design
             print('NEW DESIGN PARAMETERS: ',self.optimized_params)
             print('COST: ', self.cost)
         #else: # randomize next design
@@ -323,6 +316,8 @@ class Train():
 
         
         self.design_counter += 1 # another design
+        self.episode_counter = 0
+
         
             
     def train_single_iteration(self):
@@ -377,13 +372,14 @@ class Train():
 
         
         #for _ in range(self.episode_counter, self.episode_iterations): # train motor controls for this design iteration #added self.episode_counter
-        for _ in range(self.episode_iterations):
+        for _ in range(self.episode_counter, self.episode_iterations):
             self.currEp = _
             print('in initial design loop')
             self.train_single_iteration()
 
             print(f'range {range(self.episode_counter, self.episode_iterations)}')
-        self.design_counter+= 1
+        self.design_counter += 1
+        self.episode_counter = 0
         
         return
           
@@ -661,17 +657,19 @@ if __name__ == '__main__':
     resuming_from_checkpoint = False 
 
     if resuming_from_checkpoint:
-        trainingObj.episode_counter = 30
         trainingObj.load_networks(base_path, checkpoint_prefix)
     else:
         trainingObj.episode_counter = 0
         print("Starting fresh: episode_counter set to 0")
 
+    # Chunked execution: run a small number of design cycles per launch.
+    designs_per_run = 1
+
     # run threads as before
     motorThread = threading.Thread(target=trainingObj.motorPos, args=(stopEvent,)) 
     optiThread = threading.Thread(target=trainingObj.optiPos, args=(stopEvent,))
-    trainingloopThread = threading.Thread(target=trainingObj.run, args=(stopEvent,))
-
+    trainingloopThread = threading.Thread(target=trainingObj.run, args=(stopEvent, designs_per_run))
+    
     motorThread.start()
     optiThread.start() 
     trainingloopThread.start()
